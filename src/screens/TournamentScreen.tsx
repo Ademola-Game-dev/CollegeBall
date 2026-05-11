@@ -28,8 +28,15 @@ export default function TournamentScreen() {
   const activeTourney = season.tournaments[0]; // For now show the first one
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07111b] text-white">
-       <div className="fixed inset-0 z-0 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.08),transparent_70%)]" />
+    <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07090c] text-white">
+       {/* Background Ambience */}
+       <div className="fixed inset-0 z-0 bg-dot-grid opacity-20" />
+       <div className="fixed inset-0 z-0 glow-mesh opacity-30" />
+       
+       {/* Floating Orbs */}
+       <div className="fixed top-[5%] left-[5%] w-[40vw] h-[40vw] bg-blue-600/10 rounded-full blur-[140px] animate-float pointer-events-none" />
+       <div className="fixed bottom-[5%] right-[5%] w-[35vw] h-[35vw] bg-amber-600/10 rounded-full blur-[120px] animate-float pointer-events-none" style={{ animationDelay: '-12s' }} />
+       <div className="fixed top-[40%] right-[10%] w-[25vw] h-[25vw] bg-purple-600/10 rounded-full blur-[100px] animate-float pointer-events-none" style={{ animationDelay: '-6s' }} />
        
        {isSimulating && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
@@ -109,31 +116,35 @@ function TournamentGameCard({ game }: { game: TournamentGame }) {
   const awayWinner = game.winnerId === game.awayTeam?.id && game.winnerId !== undefined;
 
   return (
-    <div className={`glass-medium relative overflow-hidden rounded-2xl border transition-all ${game.winnerId ? 'border-white/5' : 'border-white/10'}`}>
-      <div className="flex flex-col p-4">
+    <div className={`glass-medium relative overflow-hidden rounded-[20px] border transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] ${game.winnerId ? 'border-white/5 bg-slate-900/40' : 'border-white/10 bg-white/5'}`}>
+      <div className="flex flex-col p-4 backdrop-blur-md">
         {/* Away Team */}
-        <div className={`flex items-center justify-between py-2 ${awayWinner ? 'opacity-100' : 'opacity-40'}`}>
+        <div className={`flex items-center justify-between py-2.5 transition-opacity duration-500 ${awayWinner ? 'opacity-100' : game.winnerId ? 'opacity-30' : 'opacity-80'}`}>
           <div className="flex items-center gap-3">
-             <span className="text-[9px] font-bold text-white/30">{game.awaySeed}</span>
-             <span className="text-xs font-black uppercase tracking-tight">{game.awayTeam?.name ?? 'TBD'}</span>
+             <div className="w-5 h-5 rounded bg-white/5 flex items-center justify-center text-[8px] font-black text-white/40">{game.awaySeed}</div>
+             <span className={`text-[11px] font-black uppercase tracking-tight ${awayWinner ? 'text-blue-400' : 'text-white'}`}>
+               {game.awayTeam?.name ?? 'TBD'}
+             </span>
           </div>
-          <span className="text-sm font-black">{game.awayScore ?? ''}</span>
+          <span className={`text-sm font-black ${awayWinner ? 'text-blue-400' : 'text-white/60'}`}>{game.awayScore ?? ''}</span>
         </div>
         
         <div className="h-[1px] w-full bg-white/5 my-1" />
 
         {/* Home Team */}
-        <div className={`flex items-center justify-between py-2 ${homeWinner ? 'opacity-100' : 'opacity-40'}`}>
+        <div className={`flex items-center justify-between py-2.5 transition-opacity duration-500 ${homeWinner ? 'opacity-100' : game.winnerId ? 'opacity-30' : 'opacity-80'}`}>
           <div className="flex items-center gap-3">
-             <span className="text-[9px] font-bold text-white/30">{game.homeSeed}</span>
-             <span className="text-xs font-black uppercase tracking-tight">{game.homeTeam?.name ?? 'TBD'}</span>
+             <div className="w-5 h-5 rounded bg-white/5 flex items-center justify-center text-[8px] font-black text-white/40">{game.homeSeed}</div>
+             <span className={`text-[11px] font-black uppercase tracking-tight ${homeWinner ? 'text-blue-400' : 'text-white'}`}>
+               {game.homeTeam?.name ?? 'TBD'}
+             </span>
           </div>
-          <span className="text-sm font-black">{game.homeScore ?? ''}</span>
+          <span className={`text-sm font-black ${homeWinner ? 'text-blue-400' : 'text-white/60'}`}>{game.homeScore ?? ''}</span>
         </div>
       </div>
       
       {game.winnerId && (
-        <div className="absolute top-0 right-0 h-full w-1 bg-cyan-400" />
+        <div className="absolute top-0 right-0 h-full w-1.5 bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
       )}
     </div>
   );

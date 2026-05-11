@@ -13,6 +13,9 @@ const tinySettings: GameSettings = {
   doubleBonusThreshold: 10,
   subStaminaThreshold: 25,
   homeCourtBonus: true,
+  difficulty: 1,
+  audioVolume: 0.8,
+  defaultCamera: "broadcast",
 };
 
 function makeTeam(
@@ -36,15 +39,25 @@ function makeTeam(
       rebounding: 60,
       endurance: 60,
     },
+    morale: 80,
+    potential: 75,
+    archetype: "Balanced" as any,
+    traits: [],
+    heightInches: 75,
+    skinTone: 2,
+    hairColor: "#000",
   }));
   return {
     id,
     name,
+    nickname: name + "s",
     abbreviation: id.slice(0, 3).toUpperCase(),
     primaryColor: "#fff",
     secondaryColor: "#000",
     roster,
     lineup: lineupIds as Lineup,
+    chemistry: 70,
+    region: "Midwest",
   };
 }
 

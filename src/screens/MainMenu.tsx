@@ -1,433 +1,182 @@
+import React from "react";
 import { useGameStore } from "../store/gameStore";
-import type { Team } from "../game/types";
+import { 
+  Trophy, 
+  Gamepad2, 
+  Settings as SettingsIcon, 
+  Play, 
+  Clock, 
+  Users, 
+  Info,
+  ChevronRight,
+  ShieldCheck,
+  Star
+} from "lucide-react";
 
-const MODE_CARDS = [
-  {
-    title: "Exhibition",
-    status: "Ready now",
-    summary: "Jump into a full sim-driven matchup with broadcast presentation.",
-    active: true,
-  },
-  {
-    title: "Season",
-    status: "Early access",
-    summary: "Schedule flow, roster management, and long-form progression.",
-    active: true,
-  },
-  {
-    title: "Tournament",
-    status: "Coming soon",
-    summary: "Bracket drama, quick turnarounds, and neutral-floor pressure.",
-    active: false,
-  },
-  {
-    title: "Program Builder",
-    status: "On deck",
-    summary: "Recruiting pipelines, identity choices, and school legacy systems.",
-    active: false,
-  },
-];
+// Local asset path from previous step
+const HERO_IMAGE = "college_basketball_main_menu_hero_1778534953987.png";
 
-const BUILD_NOTES = [
-  "Manifest + standalone display: add to home screen for an app-like shell.",
-  "In-game HUD uses safe-area insets and 44px minimum touch targets.",
-  "Desktop shortcuts still work; on phones, use the on-screen Game Menu.",
-];
-
-const SUPPORT_RIBBON = [
-  "Touch-friendly HUD",
-  "Add to Home Screen (PWA)",
-  "3D court on your phone",
-];
+const MenuButton = ({ onClick, icon: Icon, children, primary, subtitle }: any) => (
+  <button
+    onClick={onClick}
+    className={`group relative flex items-center justify-between w-full p-6 rounded-3xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] ${
+      primary 
+        ? "bg-blue-600 hover:bg-blue-500 shadow-2xl shadow-blue-900/40" 
+        : "bg-white/5 border border-white/10 hover:bg-white/10"
+    }`}
+  >
+    <div className="flex items-center gap-5">
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${primary ? 'bg-white/20' : 'bg-blue-600/20'}`}>
+        <Icon className={`w-6 h-6 ${primary ? 'text-white' : 'text-blue-400'}`} />
+      </div>
+      <div className="text-left">
+        <div className={`text-xl font-black uppercase tracking-wider ${primary ? 'text-white' : 'text-white/90'}`}>
+          {children}
+        </div>
+        {subtitle && <div className={`text-[10px] font-bold uppercase tracking-[0.2em] mt-1 ${primary ? 'text-white/60' : 'text-white/30'}`}>{subtitle}</div>}
+      </div>
+    </div>
+    <ChevronRight className={`w-5 h-5 ${primary ? 'text-white/40' : 'text-white/10'} group-hover:translate-x-1 transition-transform`} />
+  </button>
+);
 
 export default function MainMenu() {
-  const startExhibition = useGameStore((s) => s.startExhibition);
-  const setScreen       = useGameStore((s) => s.setScreen);
-  const homeTeam        = useGameStore((s) => s.homeTeam);
-  const awayTeam        = useGameStore((s) => s.awayTeam);
-
-  const homeProfile = getTeamProfile(homeTeam);
-  const awayProfile = getTeamProfile(awayTeam);
+  const { startExhibition, setScreen, season } = useGameStore();
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07111b] pb-[max(1rem,env(safe-area-inset-bottom,0px))] text-white">
-      <BackgroundLayers />
+    <div className="min-h-screen bg-[#07090c] text-white font-['Inter'] relative overflow-hidden flex flex-col lg:flex-row">
+      
+      {/* Visual Side (Hero) */}
+      <div className="relative w-full lg:w-3/5 h-[40vh] lg:h-screen overflow-hidden group">
+        <img 
+          src={HERO_IMAGE} 
+          alt="College Basketball Hero" 
+          className="absolute inset-0 w-full h-full object-cover object-center scale-105 group-hover:scale-100 transition-transform duration-[10000ms] ease-out"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-[#07090c] via-transparent to-transparent" />
+        
+        {/* Brand Overlay */}
+        <div className="absolute top-12 left-12 z-20">
+          <div className="flex items-center gap-3 mb-4">
+             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/40">
+                <Trophy className="w-6 h-6 text-white" />
+             </div>
+             <div className="text-xs font-black uppercase tracking-[0.6em] text-white/40">Athletic Division</div>
+          </div>
+          <h1 className="text-6xl lg:text-8xl font-black italic uppercase leading-none tracking-tighter">
+            COLLEGE<br />
+            <span className="text-blue-600">BALL</span>
+          </h1>
+        </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1560px] flex-col px-5 py-5 sm:px-8 sm:py-7 lg:px-10 xl:px-12">
-        <header className="polish-rise flex flex-col gap-4 pb-4 lg:flex-row lg:items-end lg:justify-between lg:pb-5">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.45em] text-cyan-200/70">
-              CollegeBall Mobile
-            </div>
-            <h1 className="mt-3 max-w-3xl text-5xl font-black uppercase leading-[0.88] tracking-[0.04em] text-white sm:text-6xl xl:text-[5.25rem]">
-              Pocket
-              <br />
-              Hardwood
-            </h1>
+        {/* Footer Info */}
+        <div className="absolute bottom-12 left-12 z-20 hidden lg:block">
+           <div className="flex items-center gap-8">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Sim Engine</div>
+                <div className="text-sm font-bold text-white/80">Hyper-Reactive AI v2.4</div>
+              </div>
+              <div className="w-px h-8 bg-white/10" />
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Program Count</div>
+                <div className="text-sm font-bold text-white/80">350+ Division 1 Teams</div>
+              </div>
+           </div>
+        </div>
+      </div>
+
+      {/* Menu Side */}
+      <div className="flex-1 flex flex-col justify-center p-8 lg:p-20 relative z-10 bg-[#07090c]">
+        <div className="max-w-md w-full mx-auto space-y-4">
+          
+          <div className="mb-12">
+            <h2 className="text-xs font-black uppercase tracking-[0.4em] text-blue-500 mb-2">Main Menu</h2>
+            <p className="text-white/40 text-sm italic">The journey to the championship begins with a single tip-off.</p>
           </div>
 
-          <div className="max-w-md lg:pb-2">
-            <p className="text-sm uppercase tracking-[0.32em] text-white/42">
-              Mobile basketball game · sim-driven 3D action
-            </p>
-            <p className="mt-3 text-sm leading-6 text-white/70">
-              Install as an app from your browser, play in portrait or landscape,
-              and run the full college sim with a touch-first control deck.
-            </p>
-          </div>
-        </header>
-
-        <main className="flex flex-1 flex-col gap-5 py-4 lg:gap-6 lg:py-5">
-          <section className="grid flex-1 gap-5 xl:grid-cols-[1.16fr_0.84fr]">
-            <div className="polish-rise polish-delay-1 relative flex flex-col justify-between overflow-hidden rounded-[40px] border border-white/10 bg-[linear-gradient(135deg,rgba(6,14,23,0.96),rgba(5,10,18,0.82))] px-6 py-7 shadow-[0_34px_120px_rgba(0,0,0,0.34)] sm:px-8 sm:py-9 xl:px-10">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_34%),radial-gradient(circle_at_80%_78%,rgba(245,158,11,0.12),transparent_26%)]" />
-              <div className="relative">
-                <div className="inline-flex rounded-full border border-cyan-200/15 bg-cyan-300/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-cyan-100/78">
-                  Featured Matchup
+          {season ? (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-[32px] p-6 mb-8 backdrop-blur-md relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 opacity-10 transform group-hover:scale-110 transition-transform">
+                  <Star className="w-24 h-24 text-white" />
                 </div>
-
-                <div className="mt-8 max-w-2xl">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.42em] text-white/40">
-                    Tonight's floor
-                  </p>
-                  <h2 className="mt-4 max-w-2xl text-3xl font-black uppercase leading-[0.95] tracking-[0.05em] text-white sm:text-4xl xl:text-[3.3rem]">
-                    Set the pace,
-                    <br />
-                    call the angles,
-                    <br />
-                    own the sideline.
-                  </h2>
-                  <p className="mt-5 max-w-xl text-base leading-7 text-white/70 sm:text-lg">
-                    One tap starts a full exhibition: 3D court, live scorebug,
-                    cameras and sim speed on a panel sized for thumbs—not a
-                    desktop-only layout squeezed onto glass.
-                  </p>
-                </div>
-
-                <div className="mt-8 flex flex-wrap gap-3">
-                  <button
-                    id="start-btn"
-                    onClick={startExhibition}
-                    className="rounded-full bg-amber-300 px-8 py-3.5 text-sm font-black uppercase tracking-[0.2em] text-slate-950 transition hover:bg-amber-200"
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="bg-blue-600 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">Active Career</span>
+                    <span className="text-white/40 text-[10px] font-bold uppercase tracking-widest">{season.team.name} {season.team.nickname}</span>
+                  </div>
+                  <div className="text-3xl font-black italic uppercase tracking-tight mb-4">
+                    SEASON {season.year}
+                  </div>
+                  <div className="flex items-center gap-6 mb-6">
+                    <div>
+                      <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Record</div>
+                      <div className="text-xl font-black">{season.record.wins}–{season.record.losses}</div>
+                    </div>
+                    <div className="w-px h-6 bg-white/10" />
+                    <div>
+                      <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Current Rank</div>
+                      <div className="text-xl font-black text-blue-400">#{season.rank || "NR"}</div>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setScreen("season")}
+                    className="w-full py-4 bg-white text-black font-black uppercase tracking-widest rounded-2xl hover:bg-blue-400 transition-colors active:scale-95 flex items-center justify-center gap-3"
                   >
-                    Start Exhibition
-                  </button>
-                  <button
-                    onClick={() => setScreen("new-game")}
-                    className="rounded-full border border-cyan-300/20 bg-cyan-300/8 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-300/14"
-                  >
-                    Season Hub
+                    <Play className="w-4 h-4 fill-black" />
+                    Continue Legacy
                   </button>
                 </div>
-
-                <div className="mt-10 flex flex-wrap gap-2">
-                  {SUPPORT_RIBBON.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/55"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
               </div>
 
-              <div className="relative mt-12 grid gap-4 lg:grid-cols-[1fr_1fr]">
-                <FeatureStrip
-                  eyebrow="Support"
-                  title="Mode Stack"
-                  copy="Exhibition stays in focus while the next layers remain visible and believable."
-                />
-                <FeatureStrip
-                  eyebrow="Detail"
-                  title="Game Menu"
-                  copy="The in-game overlay now feels like a huddle, not a loose set of buttons."
-                />
-              </div>
+              <MenuButton 
+                onClick={() => setScreen("new-game")} 
+                icon={Users}
+                subtitle="Start a fresh 10-season coaching career"
+              >
+                New Career
+              </MenuButton>
             </div>
+          ) : (
+            <MenuButton 
+              onClick={() => setScreen("new-game")} 
+              icon={Gamepad2} 
+              primary
+              subtitle="Build a program over 10 seasons"
+            >
+              Start Career
+            </MenuButton>
+          )}
 
-            <div className="polish-rise polish-delay-2 flex flex-col gap-5">
-              <MatchupStage
-                homeTeam={homeTeam}
-                awayTeam={awayTeam}
-                homeProfile={homeProfile}
-                awayProfile={awayProfile}
-              />
+          <MenuButton 
+            onClick={startExhibition} 
+            icon={Play}
+            subtitle="Quick play with random matchups"
+          >
+            Exhibition
+          </MenuButton>
 
-              <div className="grid gap-3 lg:grid-cols-2">
-                {MODE_CARDS.map((mode) => (
-                  <ModeCard
-                    key={mode.title}
-                    title={mode.title}
-                    status={mode.status}
-                    summary={mode.summary}
-                    active={mode.active}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
+          <MenuButton 
+            onClick={() => setScreen("settings")} 
+            icon={SettingsIcon}
+            subtitle="Audio, Gameplay, and Video preferences"
+          >
+            Settings
+          </MenuButton>
 
-          <section className="polish-rise polish-delay-3 grid gap-5 border-t border-white/8 pt-5 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="rounded-[28px] border border-white/10 bg-black/14 p-6 backdrop-blur-sm">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.38em] text-white/42">
-                Prototype Notes
-              </div>
-              <div className="mt-4 space-y-2.5 text-sm leading-6 text-white/68">
-                {BUILD_NOTES.map((note) => (
-                  <p key={note}>{note}</p>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <StatPanel label="Home overall" value={homeProfile.overall} />
-              <StatPanel label="Away overall" value={awayProfile.overall} />
-              <StatPanel label="On device" value="PWA · safe areas · 44px taps" />
-            </div>
-          </section>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-interface MatchupStageProps {
-  homeTeam: Team;
-  awayTeam: Team;
-  homeProfile: TeamProfile;
-  awayProfile: TeamProfile;
-}
-
-function MatchupStage({
-  homeTeam,
-  awayTeam,
-  homeProfile,
-  awayProfile,
-}: MatchupStageProps) {
-  return (
-    <section className="relative overflow-hidden rounded-[38px] border border-white/10 bg-[linear-gradient(135deg,rgba(8,17,29,0.95),rgba(8,17,29,0.72))] p-6 shadow-[0_32px_100px_rgba(0,0,0,0.36)] sm:p-7">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_40%),radial-gradient(circle_at_bottom,rgba(251,191,36,0.12),transparent_45%)]" />
-      <div className="polish-glow absolute right-[10%] top-[10%] h-24 w-24 rounded-full bg-white/[0.04] blur-2xl" />
-
-      <div className="relative">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.38em] text-amber-200/72">
-              Main Event
-            </div>
-            <h2 className="mt-2 text-3xl font-black uppercase tracking-[0.08em] text-white sm:text-4xl">
-              {homeTeam.abbreviation} vs {awayTeam.abbreviation}
-            </h2>
-          </div>
-          <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-right backdrop-blur-sm">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-              Tip setup
-            </div>
-            <div className="mt-1 text-sm font-semibold text-white/75">
-              Exhibition night
-            </div>
+          <div className="pt-12 flex items-center justify-between border-t border-white/5">
+             <div className="flex gap-4">
+               <button className="text-[10px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-colors flex items-center gap-1.5">
+                  <Info className="w-3 h-3" /> Credits
+               </button>
+               <button className="text-[10px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-colors flex items-center gap-1.5">
+                  <ShieldCheck className="w-3 h-3" /> License
+               </button>
+             </div>
+             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/10">Build ID: CB-LEGACY-26</div>
           </div>
         </div>
-
-        <div className="mt-7 grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-          <TeamShowcase team={homeTeam} profile={homeProfile} align="left" />
-
-          <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl font-black uppercase tracking-[0.18em] text-white/75 backdrop-blur-sm">
-            VS
-          </div>
-
-          <TeamShowcase team={awayTeam} profile={awayProfile} align="right" />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-interface TeamShowcaseProps {
-  team: Team;
-  profile: TeamProfile;
-  align: "left" | "right";
-}
-
-function TeamShowcase({ team, profile, align }: TeamShowcaseProps) {
-  const alignmentClass = align === "right" ? "lg:text-right" : "lg:text-left";
-
-  return (
-    <div
-      className={`rounded-[30px] border border-white/10 px-5 py-5 ${alignmentClass}`}
-      style={{
-        background: `linear-gradient(135deg, ${team.primaryColor}28, rgba(8, 17, 29, 0.88))`,
-      }}
-    >
-      <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-white/40">
-        {align === "left" ? "Home" : "Away"}
-      </div>
-      <div className="mt-3 text-4xl font-black uppercase tracking-[0.08em] text-white">
-        {team.abbreviation}
-      </div>
-      <div className="mt-2 text-sm text-white/75">{team.name}</div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <MiniMetric label="Overall" value={profile.overall} />
-        <MiniMetric label="Offense" value={profile.offense} />
-        <MiniMetric label="Defense" value={profile.defense} />
-      </div>
-
-      <div className="mt-4 text-xs uppercase tracking-[0.28em] text-white/38">
-        Identity
-      </div>
-      <div className="mt-2 text-sm leading-6 text-white/72">{profile.identity}</div>
-    </div>
-  );
-}
-
-interface ModeCardProps {
-  title: string;
-  status: string;
-  summary: string;
-  active: boolean;
-}
-
-function ModeCard({ title, status, summary, active }: ModeCardProps) {
-  return (
-    <article
-      className={`rounded-[28px] border p-5 backdrop-blur-sm transition ${
-        active
-          ? "border-amber-200/20 bg-amber-300/8"
-          : "border-white/10 bg-black/16"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-white/38">
-            {status}
-          </div>
-          <h3 className="mt-2 text-xl font-black uppercase tracking-[0.08em] text-white">
-            {title}
-          </h3>
-        </div>
-        <div
-          className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.3em] ${
-            active ? "bg-amber-300 text-slate-950" : "bg-white/7 text-white/55"
-          }`}
-        >
-          {active ? "Live" : "Locked"}
-        </div>
-      </div>
-      <p className="mt-3.5 text-sm leading-6 text-white/68">{summary}</p>
-    </article>
-  );
-}
-
-interface FeatureStripProps {
-  eyebrow: string;
-  title: string;
-  copy: string;
-}
-
-function FeatureStrip({ eyebrow, title, copy }: FeatureStripProps) {
-  return (
-    <div className="rounded-[30px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-sm">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-white/42">
-        {eyebrow}
-      </div>
-      <div className="mt-3 text-2xl font-black uppercase tracking-[0.08em] text-white">
-        {title}
-      </div>
-      <p className="mt-3 text-sm leading-6 text-white/66">{copy}</p>
-    </div>
-  );
-}
-
-interface StatPanelProps {
-  label: string;
-  value: string;
-}
-
-function StatPanel({ label, value }: StatPanelProps) {
-  return (
-    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4.5">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-white/38">
-        {label}
-      </div>
-      <div className="mt-3 text-2xl font-black uppercase tracking-[0.08em] text-white">
-        {value}
       </div>
     </div>
   );
-}
-
-interface MiniMetricProps {
-  label: string;
-  value: string;
-}
-
-function MiniMetric({ label, value }: MiniMetricProps) {
-  return (
-    <div className="rounded-[20px] border border-white/10 bg-black/18 px-4 py-3.5 backdrop-blur-sm">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-white/35">
-        {label}
-      </div>
-      <div className="mt-2 text-xl font-black uppercase tracking-[0.08em] text-white">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function BackgroundLayers() {
-  return (
-    <>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_34%),linear-gradient(180deg,#07111b_0%,#040a12_100%)]" />
-      <div className="absolute inset-x-[-8%] top-[12%] h-[46%] rounded-[50%] border border-white/6" />
-      <div className="absolute inset-x-[8%] top-[22%] h-[32%] rounded-[50%] border border-white/5" />
-      <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/5" />
-      <div className="absolute left-[8%] top-1/2 h-px w-[84%] bg-white/5" />
-      <div className="absolute bottom-[-12%] left-1/2 h-[35vw] w-[35vw] min-h-[240px] min-w-[240px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.14),transparent_62%)] blur-3xl" />
-    </>
-  );
-}
-
-interface TeamProfile {
-  overall: string;
-  offense: string;
-  defense: string;
-  identity: string;
-}
-
-function getTeamProfile(team: Team): TeamProfile {
-  const totals = team.roster.reduce(
-    (acc, player) => {
-      acc.shooting += player.ratings.shooting;
-      acc.passing += player.ratings.passing;
-      acc.defense += player.ratings.defense;
-      acc.rebounding += player.ratings.rebounding;
-      acc.speed += player.ratings.speed;
-      return acc;
-    },
-    { shooting: 0, passing: 0, defense: 0, rebounding: 0, speed: 0 }
-  );
-
-  const count = team.roster.length || 1;
-  const offense = Math.round((totals.shooting + totals.passing) / (count * 2));
-  const defense = Math.round((totals.defense + totals.rebounding) / (count * 2));
-  const pace = Math.round(totals.speed / count);
-  const overall = Math.round((offense + defense + pace) / 3);
-
-  let identity = "Balanced group that can survive in both half-court and transition possessions.";
-  if (offense >= defense + 6) {
-    identity = "Shot-making leans ahead of resistance, so this group wants rhythm and quick decisions.";
-  } else if (defense >= offense + 6) {
-    identity = "Defensive pressure sets the tone, built to grind out stops and own the glass.";
-  } else if (pace >= 68) {
-    identity = "Plays with real pace, pushing possessions before the defense can fully load up.";
-  }
-
-  return {
-    overall: `${overall}`,
-    offense: `${offense}`,
-    defense: `${defense}`,
-    identity,
-  };
 }

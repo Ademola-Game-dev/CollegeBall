@@ -30,7 +30,16 @@ export default function NewGameSetup() {
 
   const handleStart = () => {
     const baseTeam = AVAILABLE_TEAMS.find(t => t.id === selectedTeamId)!;
-    const fullTeam = setupUserTeam(baseTeam);
+    const fullTeam = setupUserTeam({
+      id: baseTeam.id,
+      name: baseTeam.name,
+      nickname: baseTeam.nickname,
+      abbreviation: baseTeam.abbreviation,
+      primaryColor: baseTeam.primaryColor,
+      secondaryColor: baseTeam.secondaryColor,
+      chemistry: 70,
+      region: baseTeam.region,
+    });
     
     const coach: Coach = {
       id: "coach_user",
@@ -43,19 +52,28 @@ export default function NewGameSetup() {
       level: 1,
       experience: 0,
       skillPoints: 0,
-      traitPoints: 1, // Start with 1 trait point for early customization
+      traitPoints: 1,
       traits: [],
       careerWins: 0,
       careerLosses: 0,
       history: [],
+      championships: 0,
+      tourneyAppearances: 0,
+      archetype: "Tactician" as const,
     };
 
     startSeason(fullTeam, coach);
   };
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07111b] text-white">
-      <div className="fixed inset-0 z-0 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.08),transparent_70%)]" />
+    <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07090c] text-white">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 z-0 bg-dot-grid opacity-20" />
+      <div className="fixed inset-0 z-0 glow-mesh opacity-30" />
+      
+      {/* Floating Orbs */}
+      <div className="fixed top-[10%] left-[10%] w-[30vw] h-[30vw] bg-blue-600/10 rounded-full blur-[120px] animate-float pointer-events-none" />
+      <div className="fixed bottom-[10%] right-[10%] w-[25vw] h-[25vw] bg-purple-600/10 rounded-full blur-[100px] animate-float pointer-events-none" style={{ animationDelay: '-5s' }} />
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[900px] flex-col px-6 py-10 sm:px-12 sm:py-16">
         <header className="mb-12 border-b border-white/8 pb-8">
@@ -168,22 +186,29 @@ function TeamCard({ team: t, selected, onSelect }: { team: any; selected: boolea
   return (
     <button
       onClick={onSelect}
-      className={`relative flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all ${
+      className={`relative flex items-center gap-5 rounded-[24px] border px-6 py-4 transition-all duration-300 group ${
         selected 
-          ? "border-cyan-400/50 bg-cyan-400/10 shadow-[0_0_20px_rgba(34,211,238,0.1)]" 
-          : "border-white/8 bg-white/[0.02] hover:bg-white/5"
+          ? "border-blue-500/50 bg-blue-600/10 shadow-[0_0_40px_rgba(37,99,235,0.1)] scale-[1.02]" 
+          : "border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10"
       }`}
     >
       <div 
-        className="h-10 w-10 rounded-full shadow-inner border border-white/10" 
+        className="h-12 w-12 rounded-2xl shadow-2xl border border-white/10 flex items-center justify-center text-xs font-black italic text-white/40 group-hover:scale-105 transition-transform" 
         style={{ background: `linear-gradient(135deg, ${t.primaryColor}, ${t.secondaryColor})` }} 
-      />
+      >
+        <div className="absolute inset-0 bg-black/10 rounded-2xl" />
+        <span className="relative z-10">{t.abbreviation}</span>
+      </div>
       <div className="flex flex-col items-start">
-        <div className="text-sm font-bold text-white">{t.name} {t.nickname}</div>
-        <div className="text-[10px] uppercase tracking-widest text-white/30">{t.region} Region · {t.abbreviation}</div>
+        <div className="text-base font-black uppercase tracking-tight text-white group-hover:text-blue-400 transition-colors">{t.name}</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">{t.region} Region · {t.nickname}</div>
       </div>
       {selected && (
-        <div className="ml-auto rounded-full bg-cyan-400 px-2 py-0.5 text-[8px] font-black uppercase text-slate-900">Selected</div>
+        <div className="ml-auto w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/40">
+           <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+           </svg>
+        </div>
       )}
     </button>
   );

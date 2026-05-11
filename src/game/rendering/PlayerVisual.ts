@@ -353,6 +353,7 @@ function createPrimitiveFallback(
     meshes: [shoe, legs, torso, leftArm, rightArm, head, hair],
     torsoMesh: torso,
     headMesh: head,
+    heightInches: config.heightInches,
   };
 }
 

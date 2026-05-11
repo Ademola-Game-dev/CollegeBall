@@ -7,10 +7,13 @@
 
 import { useState } from "react";
 import { useGameStore } from "../store/gameStore";
-import type { Coach, Season, SeasonGame, SeasonRecord } from "../game/types";
+import type { Coach, Season, SeasonGame, SeasonRecord, GamePlan } from "../game/types";
 import type { Player, PlayerGameStats } from "../game/types";
+import { computeTeamOverall } from "../game/data/defaults";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { BackgroundAmbience } from "../components/BackgroundAmbience";
 
-const TABS = ["Dashboard", "Coach", "Roster", "Schedule", "Rankings", "History", "News"] as const;
+const TABS = ["Dashboard", "Strategy", "Roster", "Schedule", "Rankings", "History", "News"] as const;
 type Tab = (typeof TABS)[number];
 
 const POSITION_LABELS: Record<string, string> = {
@@ -55,7 +58,7 @@ export default function SeasonHub() {
 
   return (
     <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07111b] pb-[max(1rem,env(safe-area-inset-bottom,0px))] text-white">
-      <SeasonBackgroundLayers />
+      <BackgroundAmbience theme={season.postseasonStatus !== "none" ? "postseason" : "default"} />
       
       {isSimulating && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
@@ -67,56 +70,29 @@ export default function SeasonHub() {
       )}
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1200px] flex-col px-5 py-5 sm:px-8 sm:py-7">
-        {/* ---- Broadcast Header ---- */}
-        <header className="relative flex flex-col gap-6 border-b border-white/5 pb-8 lg:flex-row lg:items-end lg:justify-between mobile-stack">
-          <div className="flex items-center gap-6">
-            <div 
-              className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/10 shadow-2xl"
-              style={{ background: `linear-gradient(135deg, ${season.team.primaryColor}, ${season.team.secondaryColor})` }}
-            >
-              <div className="absolute inset-0 bg-black/10" />
-              <span className="relative z-10 text-4xl font-black italic tracking-tighter text-white drop-shadow-lg">
-                {season.team.abbreviation}
-              </span>
-              <div className="absolute -bottom-2 -right-2 h-12 w-12 rounded-full bg-white/10 blur-xl" />
-            </div>
-            
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="rounded-full bg-cyan-400 px-3 py-0.5 text-[10px] font-black uppercase tracking-widest text-slate-950">
-                  {season.rank ? `#${season.rank}` : "Unranked"}
-                </span>
-                <span className="text-[11px] font-bold uppercase tracking-[0.4em] text-white/30">
-                  Week {season.currentGameIndex + 1} · {season.year} Campaign
+        <ScreenHeader 
+          title={season.team.name}
+          subtitle={`Week ${season.currentGameIndex + 1} · ${season.year} Campaign`}
+          category={season.rank ? `#${season.rank}` : "Unranked"}
+          categoryColor="bg-cyan-400"
+          actions={
+            <div className="flex items-center gap-6">
+              <div className="flex flex-col items-end px-4 border-r border-white/10">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">NIL Budget</span>
+                <span className="text-xl font-black text-white">${(season.nilBudget / 1000).toFixed(1)}k</span>
+              </div>
+              <div 
+                className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
+                style={{ background: `linear-gradient(135deg, ${season.team.primaryColor}, ${season.team.secondaryColor})` }}
+              >
+                <div className="absolute inset-0 bg-black/10" />
+                <span className="relative z-10 text-2xl font-black italic tracking-tighter text-white drop-shadow-lg">
+                  {season.team.abbreviation}
                 </span>
               </div>
-              <h1 className="mt-2 text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">
-                {season.team.name}
-              </h1>
-              <div className="mt-1 flex items-center gap-2 text-sm font-medium text-white/40">
-                <span>{season.team.nickname}</span>
-                <span className="h-1 w-1 rounded-full bg-white/20" />
-                <span className="text-cyan-400/80">{season.conferenceName} Conference</span>
-              </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end px-4 border-r border-white/10">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">NIL Budget</span>
-              <span className="text-xl font-black text-white">${(season.nilBudget / 1000).toFixed(1)}k</span>
-            </div>
-            <button
-              onClick={() => setScreen("menu")}
-              className="group flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition hover:bg-white/10"
-              title="Return to Menu"
-            >
-              <svg className="h-5 w-5 text-white/40 transition group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </header>
+          }
+        />
 
         {/* ---- Navigation ---- */}
         <nav className="sticky top-0 z-40 -mx-5 mt-4 bg-[#07111b]/80 px-5 py-3 backdrop-blur-md lg:mx-0 lg:rounded-2xl lg:px-6">
@@ -144,8 +120,9 @@ export default function SeasonHub() {
           {activeTab === "Dashboard" && (
             <>
               {/* ---- Coach + Record + Economy ---- */}
+              {/* ---- Coach + Record + Goals ---- */}
               <div className="grid gap-5 sm:grid-cols-3">
-                <CoachCard coach={season.coach} season={season} onUpgrade={upgradeCoach} />
+                <CoachCard coach={season.coach} _season={season} onUpgrade={upgradeCoach} />
                 <RecordCard
                   record={season.record}
                   conferenceRecord={season.conferenceRecord}
@@ -154,10 +131,13 @@ export default function SeasonHub() {
                   total={season.schedule.length}
                   rank={season.rank}
                 />
-                <div className="flex flex-col gap-5">
-                  <EconomyCard season={season} onUpgradeNIL={upgradeNILCollective} />
-                  <RecruitingCard season={season} onRecruit={() => setScreen("recruiting")} />
-                </div>
+                <SeasonGoalsCard goals={season.goals} />
+              </div>
+
+              {/* ---- Economy + Recruiting ---- */}
+              <div className="grid gap-5 sm:grid-cols-2">
+                <EconomyCard season={season} onUpgradeNIL={upgradeNILCollective} />
+                <RecruitingCard season={season} onRecruit={() => setScreen("recruiting")} />
               </div>
 
               {season.postseasonStatus !== "none" && season.postseasonStatus !== "complete" && (
@@ -205,7 +185,7 @@ export default function SeasonHub() {
             </>
           )}
 
-              {activeTab === "Coach" && (
+          {activeTab === "History" && (
                 <div className="flex flex-col gap-8">
                   <CoachProfilePanel coach={season.coach} onUpgrade={upgradeCoach} onUpgradeTrait={upgradeCoachTrait} />
                   
@@ -274,6 +254,29 @@ export default function SeasonHub() {
   );
 }
 
+function SeasonGoalsCard({ goals }: { goals: import("../game/types").SeasonGoal[] }) {
+  return (
+    <div className="glass-thick rounded-[40px] border border-white/5 p-8">
+      <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Season Objectives</h3>
+      <div className="mt-6 flex flex-col gap-6">
+        {goals.map((goal) => (
+          <div key={goal.id} className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <span className={`text-xs font-bold uppercase tracking-widest ${goal.completed ? 'text-emerald-400 line-through' : 'text-white/80'}`}>
+                {goal.description}
+              </span>
+              <span className="text-[9px] font-black text-white/20">+{goal.rewardXP} XP</span>
+            </div>
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full border ${goal.completed ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-400' : 'border-white/5 bg-white/[0.02] text-white/10'}`}>
+              {goal.completed ? "✓" : "○"}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RankingPanel({ 
   top25, 
   userTeamId,
@@ -315,49 +318,6 @@ function RankingPanel({
   );
 }
 
-function StrategyCard({ 
-  gamePlan, 
-  onUpdate 
-}: { 
-  gamePlan: import("../game/types").GamePlan; 
-  onUpdate: (p: Partial<import("../game/types").GamePlan>) => void 
-}) {
-  const options = {
-    pace: ["slow", "balanced", "fast"],
-    focus: ["interior", "balanced", "perimeter"],
-    defensiveIntensity: ["conservative", "neutral", "aggressive"]
-  };
-
-  return (
-    <div className="rounded-[36px] border border-white/10 bg-[rgba(6,14,23,0.82)] px-6 py-7">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-cyan-200/50">Strategy</div>
-      <div className="mt-4 flex flex-col gap-4">
-        {Object.entries(options).map(([key, vals]) => (
-          <div key={key}>
-            <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-white/30">
-              {key === "defensiveIntensity" ? "Defense" : key}
-            </div>
-            <div className="flex gap-1 rounded-2xl bg-white/5 p-1">
-              {vals.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onUpdate({ [key]: v })}
-                  className={`flex-1 rounded-xl px-2 py-1.5 text-[9px] font-black uppercase tracking-wider transition ${
-                    gamePlan[key as keyof typeof gamePlan] === v
-                      ? "bg-cyan-400 text-black"
-                      : "text-white/40 hover:bg-white/5 hover:text-white/70"
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -365,11 +325,11 @@ function StrategyCard({
 
 interface CoachCardProps {
   coach: import("../game/types").Coach;
-  season: import("../game/types").Season;
+  _season?: import("../game/types").Season;
   onUpgrade?: (stat: "offense" | "defense" | "recruiting" | "development") => void;
 }
 
-function CoachCard({ coach, season, onUpgrade }: CoachCardProps) {
+function CoachCard({ coach, onUpgrade }: CoachCardProps) {
   const attrs: { label: string; key: "offense" | "defense" | "recruiting" | "development" }[] = [
     { label: "Off", key: "offense" },
     { label: "Def", key: "defense" },
@@ -381,8 +341,8 @@ function CoachCard({ coach, season, onUpgrade }: CoachCardProps) {
   const xpPct = (coach.experience / xpNeeded) * 100;
 
   return (
-    <div className="group relative overflow-hidden rounded-[40px] border border-white/10 bg-slate-950/40 p-8 transition-all hover:border-white/20">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.1),transparent_50%)]" />
+    <div className="group relative overflow-hidden rounded-[40px] border border-white/10 bg-slate-950/40 p-8 transition-all duration-500 hover:border-blue-500/30 hover:shadow-[0_40px_120px_-20px_rgba(0,0,0,0.7)] backdrop-blur-3xl">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.15),transparent_60%)]" />
       
       <div className="relative">
         <div className="flex items-start justify-between">
@@ -493,8 +453,8 @@ function RecordCard({ record, conferenceRecord, conferenceName, gamesPlayed, tot
     : 0;
 
   return (
-    <div className="group relative overflow-hidden rounded-[40px] border border-white/10 bg-slate-950/40 p-8 transition-all hover:border-white/20">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.08),transparent_50%)]" />
+    <div className="group relative overflow-hidden rounded-[40px] border border-white/10 bg-slate-950/40 p-8 transition-all duration-500 hover:border-amber-500/30 hover:shadow-[0_40px_120px_-20px_rgba(0,0,0,0.7)] backdrop-blur-3xl">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.15),transparent_60%)]" />
       <div className="relative">
         <div className="flex items-center justify-between">
           <div className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">
@@ -614,7 +574,7 @@ interface NextGameCardProps {
 }
 
 function NextGameCard({ game, onPlay, onSim }: NextGameCardProps) {
-  const oppOverall = computeTeamOverall(game.opponent);
+  const oppOverall = game.opponent.overall ?? 70;
   
   return (
     <div className="glass-thick group relative overflow-hidden rounded-[40px] p-8 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)]">
@@ -829,9 +789,9 @@ interface RosterRowProps {
 }
 
 function RosterRow({ player: p, isBench = false, stats, gamesPlayed = 0 }: RosterRowProps) {
-  const ppg = stats && gamesPlayed > 0 ? (stats.pts / gamesPlayed).toFixed(1) : "0.0";
-  const rpg = stats && gamesPlayed > 0 ? (stats.reb / gamesPlayed).toFixed(1) : "0.0";
-  const apg = stats && gamesPlayed > 0 ? (stats.ast / gamesPlayed).toFixed(1) : "0.0";
+  const ppg = stats && gamesPlayed > 0 ? (stats.points / gamesPlayed).toFixed(1) : "0.0";
+  const rpg = stats && gamesPlayed > 0 ? (stats.rebounds / gamesPlayed).toFixed(1) : "0.0";
+  const apg = stats && gamesPlayed > 0 ? (stats.assists / gamesPlayed).toFixed(1) : "0.0";
 
   const ratings = [
     { label: "SPD", value: p.ratings.speed },
@@ -1133,7 +1093,11 @@ function NewsPanel({ news, isCompact = false }: { news: import("../game/types").
           ))
         )}
       </div>
- function HistoryPanel({ history }: { history: import("../game/types").SeasonHistory[] }) {
+    </div>
+  );
+}
+
+function HistoryPanel({ history }: { history: import("../game/types").SeasonHistory[] }) {
   return (
     <div className="rounded-[36px] border border-white/10 bg-[rgba(6,14,23,0.82)] px-6 py-7 sm:px-8">
       <div className="text-[11px] font-semibold uppercase tracking-[0.4em] text-white/42">
@@ -1179,21 +1143,7 @@ function NewsPanel({ news, isCompact = false }: { news: import("../game/types").
     </div>
   );
 }
->
-    </div>
-  );
-}
 
-function SeasonBackgroundLayers() {
-  return (
-    <>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.14),transparent_30%),linear-gradient(180deg,#07111b_0%,#040a12_100%)]" />
-      <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/4" />
-      <div className="absolute left-[8%] top-1/2 h-px w-[84%] bg-white/4" />
-      <div className="absolute bottom-[-10%] left-1/2 h-[30vw] w-[30vw] min-h-[200px] min-w-[200px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.1),transparent_62%)] blur-3xl" />
-    </>
-  );
-}
 
 function CoachProfilePanel({ coach, onUpgrade }: { coach: Coach; onUpgrade: (s: any) => void; onUpgradeTrait: (t: any) => void }) {
   const stats = [
@@ -1376,6 +1326,89 @@ function CoachTraitsPanel({ coach, onUpgrade }: { coach: import("../game/types")
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function StrategyTab({ season, updateGamePlan }: { season: Season; updateGamePlan: (plan: Partial<GamePlan>) => void }) {
+  const plan = season.gamePlan;
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <StrategyCard 
+          title="Tempo & Pace" 
+          desc="Determines how quickly your team looks to shoot."
+          options={["Relaxed", "Balanced", "Push"]}
+          current={plan.pace}
+          onSelect={(val) => updateGamePlan({ pace: val as any })}
+          icon="â±ï¸"
+        />
+        <StrategyCard 
+          title="Offensive Focus" 
+          desc="Prioritizes shot location and player usage."
+          options={["Inside", "Balanced", "Outside"]}
+          current={plan.focus}
+          onSelect={(val) => updateGamePlan({ focus: val as any })}
+          icon="ðŸŽ¯"
+        />
+        <StrategyCard 
+          title="Defensive Pressure" 
+          desc="Balances between lane protection and ball pressure."
+          options={["Passive", "Standard", "Aggressive"]}
+          current={plan.defense}
+          onSelect={(val) => updateGamePlan({ defense: val as any })}
+          icon="ðŸ›¡ï¸"
+        />
+      </div>
+
+      <div className="glass-thick rounded-[40px] border border-white/5 p-8">
+        <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-md">
+            <h3 className="text-xl font-black uppercase italic tracking-tight text-white">Rotation Depth</h3>
+            <p className="mt-2 text-sm text-white/40">Higher values give more minutes to your bench, keeping starters fresh for the final minutes.</p>
+          </div>
+          <div className="flex items-center gap-6">
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              value={plan.benchUsage} 
+              onChange={(e) => updateGamePlan({ benchUsage: parseInt(e.target.value) })}
+              className="h-2 w-48 appearance-none rounded-full bg-white/10 accent-blue-500"
+            />
+            <span className="text-2xl font-black italic text-blue-400">{plan.benchUsage}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StrategyCard({ title, desc, options, current, onSelect, icon }: any) {
+  return (
+    <div className="glass-thick rounded-[40px] border border-white/5 p-8 backdrop-blur-3xl">
+      <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-2xl">
+        {icon}
+      </div>
+      <h3 className="text-lg font-black uppercase italic tracking-tight text-white">{title}</h3>
+      <p className="mt-2 text-xs text-white/30 leading-relaxed">{desc}</p>
+      
+      <div className="mt-8 flex flex-col gap-2">
+        {options.map((opt: string) => (
+          <button
+            key={opt}
+            onClick={() => onSelect(opt)}
+            className={`rounded-2xl border px-6 py-4 text-[11px] font-black uppercase tracking-widest transition-all ${
+              current === opt 
+                ? "border-blue-500/50 bg-blue-600/10 text-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.1)]" 
+                : "border-white/5 bg-white/[0.02] text-white/30 hover:bg-white/5 hover:text-white/60"
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
       </div>
     </div>
   );

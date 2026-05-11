@@ -12,6 +12,8 @@ import { useState } from "react";
 import { useGameStore } from "../store/gameStore";
 import type { Prospect } from "../game/types";
 import { prospectGrade } from "../game/types";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { BackgroundAmbience } from "../components/BackgroundAmbience";
 
 const POSITION_ORDER = ["PG", "SG", "SF", "PF", "C", "All"] as const;
 type PositionFilter = (typeof POSITION_ORDER)[number];
@@ -20,12 +22,12 @@ const REGION_ORDER = ["All", "West", "Midwest", "East", "South"] as const;
 type RegionFilter = (typeof REGION_ORDER)[number];
 
 export default function RecruitingScreen() {
-  const season         = useGameStore((s) => s.season);
-  const prospects      = useGameStore((s) => s.prospects);
-  const scoutProspect  = useGameStore((s) => s.scoutProspect);
-  const contactProspect = useGameStore((s) => s.contactProspect);
-  const offerNil       = useGameStore((s) => s.offerNil);
-  const offerProspect  = useGameStore((s) => s.offerProspect);
+  const season          = useGameStore((s) => s.season);
+  const prospects       = useGameStore((s) => s.prospects);
+  const scoutProspect   = useGameStore((s) => s.scoutProspect);
+  const pitchProspect   = useGameStore((s) => s.pitchProspect);
+  const offerNil        = useGameStore((s) => s.offerNil);
+  const offerProspect   = useGameStore((s) => s.offerProspect);
   const finishRecruiting = useGameStore((s) => s.finishRecruiting);
 
   const [posFilter, setPosFilter] = useState<PositionFilter>("All");
@@ -50,45 +52,29 @@ export default function RecruitingScreen() {
 
   return (
     <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07111b] pb-20 text-white">
-      <RecruitingBg />
+      <BackgroundAmbience theme="recruiting" />
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1200px] flex-col px-5 py-5 sm:px-8 sm:py-7">
-        {/* Header */}
-        <header className="relative flex flex-col gap-6 border-b border-white/5 pb-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-3">
-                <span className="rounded-full bg-emerald-400 px-3 py-0.5 text-[10px] font-black uppercase tracking-widest text-slate-950">
-                  Off-Season
-                </span>
-                <span className="text-[11px] font-bold uppercase tracking-[0.4em] text-white/30">
-                  Target Selection Cycle
-                </span>
+        <ScreenHeader 
+          title="Scouting Hub"
+          subtitle="Target Selection Cycle"
+          category="Off-Season"
+          categoryColor="bg-emerald-400"
+          actions={
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col items-end px-4 border-r border-white/10">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">Target Goal</span>
+                <span className="text-xl font-black text-white">{committed.length} / {openSpots} Signed</span>
               </div>
-              <h1 className="mt-2 text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">
-                Scouting Hub
-              </h1>
-              <div className="mt-1 flex items-center gap-2 text-sm font-medium text-white/40">
-                <span>{season.team.name}</span>
-                <span className="h-1 w-1 rounded-full bg-white/20" />
-                <span className="text-emerald-400/80">Signing Window Open</span>
-              </div>
+              <button
+                onClick={finishRecruiting}
+                className="group relative flex h-14 items-center justify-center overflow-hidden rounded-2xl bg-emerald-400 px-8 text-slate-950 transition-all hover:bg-emerald-300 active:scale-95 glow-cyan"
+              >
+                <span className="relative z-10 text-sm font-black uppercase tracking-[0.2em]">Sign Class</span>
+              </button>
             </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col items-end px-4 border-r border-white/10">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">Target Goal</span>
-              <span className="text-xl font-black text-white">{committed.length} / {openSpots} Signed</span>
-            </div>
-            <button
-              onClick={finishRecruiting}
-              className="group relative flex h-14 items-center justify-center overflow-hidden rounded-2xl bg-emerald-400 px-8 text-slate-950 transition-all hover:bg-emerald-300 active:scale-95 glow-cyan"
-            >
-              <span className="relative z-10 text-sm font-black uppercase tracking-[0.2em]">Sign Class</span>
-            </button>
-          </div>
-        </header>
+          }
+        />
 
         <main className="mt-10 flex flex-1 flex-col gap-8">
           {/* Summary stats */}
@@ -133,7 +119,7 @@ export default function RecruitingScreen() {
                 key={p.id}
                 p={p}
                 scout={() => scoutProspect(p.id)}
-                contact={() => contactProspect(p.id)}
+                pitchProspect={pitchProspect}
                 offerNil={(amt) => offerNil(p.id, amt)}
                 offer={() => offerProspect(p.id)}
               />
@@ -145,11 +131,23 @@ export default function RecruitingScreen() {
   );
 }
 
-function ProspectRow({ p, scout, contact, offerNil, offer }: { p: Prospect, scout: () => void, contact: () => void, offerNil: (amt: number) => void, offer: () => void }) {
+function ProspectRow({ p, scout, pitchProspect, offerNil, offer }: {
+  p: Prospect;
+  scout: () => void;
+  pitchProspect: (id: string, pitch: "nil" | "playingTime" | "prestige" | "academic") => void;
+  offerNil: (amt: number) => void;
+  offer: () => void;
+}) {
   const starCount = Math.max(1, Math.min(5, Math.floor((p.rating - 55) / 7)));
+  const [showPitchMenu, setShowPitchMenu] = useState(false);
+  const pitch = (type: "nil" | "playingTime" | "prestige" | "academic") => {
+    pitchProspect(p.id, type);
+    setShowPitchMenu(false);
+  };
   
   return (
-    <div className={`group relative overflow-hidden rounded-[32px] border p-5 transition-all active:scale-[0.99] ${p.committed ? 'border-emerald-400/30 bg-emerald-400/5 shadow-[0_0_20px_rgba(52,211,153,0.1)]' : 'border-white/5 bg-slate-950/40 hover:border-white/15 hover:bg-slate-900/60'}`}>
+    <div className={`group relative overflow-hidden rounded-[36px] border p-6 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] ${p.committed ? 'border-emerald-500/30 bg-emerald-500/5 shadow-[0_20px_60px_-10px_rgba(16,185,129,0.15)]' : 'border-white/5 bg-slate-950/40 hover:border-white/20 hover:bg-slate-900/60 shadow-2xl backdrop-blur-3xl'}`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] to-transparent pointer-events-none" />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
         {/* Info */}
         <div className="flex min-w-[260px] items-center gap-5">
@@ -185,6 +183,15 @@ function ProspectRow({ p, scout, contact, offerNil, offer }: { p: Prospect, scou
               {Math.round(p.interestLevel * 100)}%
             </span>
           </div>
+
+          {p.scouted && (
+            <div className="flex items-center gap-3 px-4 border-l border-white/5">
+               <PriorityIcon label="NIL" value={p.priorities.nil} />
+               <PriorityIcon label="PT" value={p.priorities.playingTime} />
+               <PriorityIcon label="PR" value={p.priorities.prestige} />
+               <PriorityIcon label="AC" value={p.priorities.academic} />
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -196,9 +203,21 @@ function ProspectRow({ p, scout, contact, offerNil, offer }: { p: Prospect, scou
             </div>
           ) : (
             <>
-              {!p.scouted && <ActionBtn onClick={scout} label="Scout" color="cyan" icon="radar" />}
-              <ActionBtn onClick={contact} label="Contact" color="cyan" icon="phone" />
-              <ActionBtn onClick={() => offerNil(5000)} label="+$5k NIL" color="amber" icon="money" />
+              {!p.scouted && <ActionBtn onClick={scout} label="Scout" color="cyan" />}
+              
+              <div className="relative flex-1">
+                <ActionBtn onClick={() => setShowPitchMenu(!showPitchMenu)} label="Pitch" color="cyan" />
+                {showPitchMenu && (
+                  <div className="absolute bottom-full left-0 mb-2 w-48 overflow-hidden rounded-2xl border border-white/10 bg-[#0a0f18] p-2 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in slide-in-from-bottom-2">
+                    <PitchOption onClick={() => pitch("nil")} label="NIL Collective" icon="ðŸ’°" />
+                    <PitchOption onClick={() => pitch("playingTime")} label="Playing Time" icon="â ±ï¸ " />
+                    <PitchOption onClick={() => pitch("prestige")} label="Program Prestige" icon="ðŸ †" />
+                    <PitchOption onClick={() => pitch("academic")} label="Academics" icon="ðŸŽ“" />
+                  </div>
+                )}
+              </div>
+
+              <ActionBtn onClick={() => offerNil(5000)} label="+$5k NIL" color="amber" />
               <button
                 onClick={offer}
                 disabled={p.offered}
@@ -216,7 +235,7 @@ function ProspectRow({ p, scout, contact, offerNil, offer }: { p: Prospect, scou
   );
 }
 
-function ActionBtn({ onClick, label, color, icon }: { onClick: () => void, label: string, color: string, icon?: string }) {
+function ActionBtn({ onClick, label, color }: { onClick: () => void, label: string, color: string }) {
   return (
     <button
       onClick={onClick}
@@ -253,16 +272,37 @@ function StarRating({ count }: { count: number }) {
   );
 }
 
+function PriorityIcon({ label, value }: { label: string, value: number }) {
+  const getColor = (v: number) => {
+    if (v > 0.8) return "text-emerald-400";
+    if (v > 0.5) return "text-cyan-400";
+    if (v > 0.3) return "text-white/40";
+    return "text-white/10";
+  };
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[7px] font-black uppercase text-white/20">{label}</span>
+      <div className={`text-[10px] font-black ${getColor(value)}`}>
+        {value > 0.8 ? "!!!" : value > 0.5 ? "!!" : value > 0.3 ? "!" : "-"}
+      </div>
+    </div>
+  );
+}
+
+function PitchOption({ onClick, label, icon }: { onClick: () => void, label: string, icon: string }) {
+  return (
+    <button 
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-white/60 transition-all hover:bg-white/5 hover:text-white"
+    >
+      <span className="text-sm">{icon}</span>
+      {label}
+    </button>
+  );
+}
+
 const PointIcon = () => <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>;
 const NILIcon = () => <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const SpotIcon = () => <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
 const CheckIcon = () => <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
-function RecruitingBg() {
-  return (
-    <>
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_40%),linear-gradient(180deg,#07111b_0%,#040a12_100%)]" />
-      <div className="fixed left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/5" />
-    </>
-  );
-}

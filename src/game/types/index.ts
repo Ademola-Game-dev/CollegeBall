@@ -269,7 +269,7 @@ export interface SimEvent {
 // Game State (UI-level)
 // ---------------------------------------------------------------------------
 
-export type Screen = "menu" | "new-game" | "game" | "season" | "recruiting" | "jobOffers" | "tournaments";
+export type Screen = "menu" | "new-game" | "game" | "season" | "recruiting" | "jobOffers" | "tournaments" | "coach-hub" | "transfer-portal" | "settings";
 
 export type GameSpeed = 0.5 | 1 | 2 | 4;
 
@@ -303,6 +303,19 @@ export interface GameSettings {
    * Defaults to 50 (neutral).
    */
   coachDefense?: number;
+  /** Simulation difficulty level (0=Freshman, 1=Varsity, 2=All-American, 3=Legend). */
+  difficulty: number;
+  /** Global audio volume (0–1). */
+  audioVolume: number;
+  /** Default camera mode. */
+  defaultCamera: CameraMode;
+}
+
+export interface GamePlan {
+  pace: "Relaxed" | "Balanced" | "Push";
+  focus: "Inside" | "Balanced" | "Outside";
+  defense: "Passive" | "Standard" | "Aggressive";
+  benchUsage: number; // 0-100
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +359,13 @@ export interface Coach {
   /** Total losses across all seasons in this career. */
   careerLosses: number;
   /** Historical performance record across different programs. */
-  history: { teamId: string; teamName: string; year: number; wins: number; losses: number }[];
+  history: { teamId: string; teamName: string; year: number; wins: number; losses: number; postseason: string | null }[];
+  /** Total championships won. */
+  championships: number;
+  /** Total NCAA tournament appearances. */
+  tourneyAppearances: number;
+  /** Primary focus (e.g., "Grit & Grind", "Run & Gun"). */
+  archetype: string;
 }
 
 export interface JobOffer {
@@ -414,6 +433,15 @@ export interface NewsItem {
   tone: "positive" | "neutral" | "negative";
 }
 
+/** Tactical strategy settings that influence simulation tendencies and pace. */
+export interface GamePlan {
+  pace: "Relaxed" | "Balanced" | "Push";
+  focus: "Inside" | "Balanced" | "Outside";
+  defense: "Passive" | "Standard" | "Aggressive";
+  benchUsage: number;
+  defensiveIntensity?: "conservative" | "neutral" | "aggressive";
+}
+
 /** Full season state for head-coach mode. */
 export interface Season {
   /** Four-digit season year (e.g. 2025). */
@@ -423,6 +451,7 @@ export interface Season {
   team: Team;
   schedule: SeasonGame[];
   record: SeasonRecord;
+  conferenceRecord: SeasonRecord;
   /** Index into schedule of the next unplayed game. Equals schedule.length when the season is complete. */
   currentGameIndex: number;
   /**
@@ -432,22 +461,11 @@ export interface Season {
   seasonStats: Record<string, PlayerGameStats>;
   /** Number of games fully played through the 3D engine (used to compute per-game averages). */
   gamesPlayedWithStats: number;
-  /**
-   * Conference win–loss record (conf games only).
-   * Ported from CFHC's conference-schedule tracking.
-   */
-  conferenceRecord: SeasonRecord;
-  /**
-   * Program prestige (0–100). Influences recruiting quality and opponent strength.
-   * Inspired by CFHC's team-prestige system.
-   */
+  /** Program prestige (0–100). Influences recruiting quality and opponent strength. */
   prestige: number;
-  /**
-   * Name of the user's conference (e.g. "Big East").
-   * Used to label conference games in the schedule.
-   */
+  /** Name of the user's conference (e.g. "Big East"). */
   conferenceName: string;
-  /** Current program budget in dollars. Used for recruiting and NIL upgrades. */
+  /** Current program budget in dollars. */
   budget: number;
   /** NIL collective level (0–10). Higher levels improve recruiting and revenue. */
   nilCollectiveLevel: number;
@@ -459,7 +477,7 @@ export interface Season {
   recruitingClassRank: number | null;
   /** Composite rating of the user's incoming recruiting class. */
   recruitingClassRating: number;
-  /** Active tactical settings for the team. */
+  /** The current tactical game plan. */
   gamePlan: GamePlan;
   /** Points available for recruiting actions this week. */
   recruitingPoints: number;
@@ -467,13 +485,25 @@ export interface Season {
   nilBudget: number;
   /** Historical records of past seasons in this career. */
   history: SeasonHistory[];
-  /** Current postseason status (e.g. "Final Four", "Round of 64", null). */
+  /** Current postseason status. */
   postseasonStatus: "none" | "conf_tourney" | "main_tourney" | "nit_tourney" | "complete";
   /** Pending job offers at the end of the season. */
   jobOffers: JobOffer[];
   /** Active news feed for the current season. */
   news: NewsItem[];
   tournaments: Tournament[];
+  /** Season objectives (Dynasty mode goals). */
+  goals: SeasonGoal[];
+}
+
+export interface SeasonGoal {
+  id: string;
+  description: string;
+  targetValue: number;
+  currentValue: number;
+  rewardXP: number;
+  type: "wins" | "ranking" | "recruiting" | "rival" | "postseason";
+  completed: boolean;
 }
 
 export interface Tournament {
@@ -514,13 +544,6 @@ export interface SeasonHistory {
   wins: number;
   losses: number;
   postseason: string | null;
-}
-
-/** Tactical strategy settings that influence simulation tendencies and pace. */
-export interface GamePlan {
-  pace: "slow" | "balanced" | "fast";
-  focus: "interior" | "balanced" | "perimeter";
-  defensiveIntensity: "conservative" | "neutral" | "aggressive";
 }
 
 /** Entry in the weekly Top 25 rankings. */
@@ -579,6 +602,17 @@ export interface Prospect {
   heightInches: number;
   skinTone: number;
   hairColor: string;
+  /** True if this is a transfer from another school (not a high school recruit). */
+  isTransfer?: boolean;
+  /** Original school for transfers. */
+  previousSchool?: string;
+  /** Recruiting priorities (what they care about). */
+  priorities: {
+    nil: number;
+    playingTime: number;
+    prestige: number;
+    academic: number;
+  };
 }
 
 /** Letter grade derived from a prospect's rating (if not yet scouted). */

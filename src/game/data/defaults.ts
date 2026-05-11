@@ -123,7 +123,6 @@ function assignYear(slotIndex: number): 1 | 2 | 3 | 4 {
 }
 
 function makePlayers(
-  _teamId: string,
   names: [string, string, PlayerPosition, number][]
 ): Player[] {
   return names.map(([first, last, pos, num], idx) => ({
@@ -134,8 +133,8 @@ function makePlayers(
     position: pos,
     ratings: makeRatings(pos),
     year: assignYear(idx),
-    morale: 80 + rand(-5, 10), // start with healthy morale
-    potential: 50 + rand(0, 45), // random potential 50-95
+    morale: 80 + rand(-5, 10),
+    potential: 50 + rand(0, 45),
     archetype: pickArchetype(pos),
     traits: pickTraits(pos),
     heightInches: randomHeight(pos),
@@ -156,7 +155,7 @@ function pickArchetype(pos: import("../types").PlayerPosition): import("../types
   return list[Math.floor(Math.random() * list.length)];
 }
 
-function pickTraits(pos: import("../types").PlayerPosition): import("../types").PlayerTrait[] {
+function pickTraits(_pos: import("../types").PlayerPosition): import("../types").PlayerTrait[] {
   const pool: import("../types").PlayerTrait[] = ["Clutch", "Floor General", "Brick Wall", "Microwave", "Enforcer", "High Motor"];
   const traits: import("../types").PlayerTrait[] = [];
   if (Math.random() > 0.6) {
@@ -169,7 +168,7 @@ function pickTraits(pos: import("../types").PlayerPosition): import("../types").
 // Default teams
 // ---------------------------------------------------------------------------
 
-const homePlayers = makePlayers("home", [
+const homePlayers = makePlayers([
   ["Marcus", "Johnson", "PG", 1],
   ["Jaylen", "Williams", "SG", 2],
   ["DeAndre", "Smith", "SF", 3],
@@ -180,7 +179,7 @@ const homePlayers = makePlayers("home", [
   ["Devon", "Taylor", "SF", 13],
 ]);
 
-const awayPlayers = makePlayers("away", [
+const awayPlayers = makePlayers([
   ["Jordan", "Carter", "PG", 1],
   ["Isaiah", "Harris", "SG", 2],
   ["Caleb", "Martin", "SF", 3],
@@ -193,7 +192,8 @@ const awayPlayers = makePlayers("away", [
 
 export const defaultHomeTeam: Team = {
   id: "home",
-  name: "State Bulldogs",
+  name: "State",
+  nickname: "Bulldogs",
   abbreviation: "STB",
   primaryColor: "#1e40af",
   secondaryColor: "#ffffff",
@@ -225,6 +225,22 @@ export const defaultGameSettings: GameSettings = {
   homeCourtBonus: true,
   coachOffense: 50,
   coachDefense: 50,
+  difficulty: 1, // Varsity
+  audioVolume: 0.8,
+  defaultCamera: "broadcast",
+  gamePlan: {
+    pace: "Balanced",
+    focus: "Balanced",
+    defense: "Standard",
+    benchUsage: 50,
+  },
+};
+
+export const defaultGamePlan: import("../types").GamePlan = {
+  pace: "Balanced",
+  focus: "Balanced",
+  defense: "Standard",
+  benchUsage: 50,
 };
 
 export const defaultCoach: Coach = {
@@ -238,8 +254,14 @@ export const defaultCoach: Coach = {
   level: 1,
   experience: 0,
   skillPoints: 0,
+  traitPoints: 0,
+  traits: [],
   careerWins: 0,
   careerLosses: 0,
+  history: [],
+  championships: 0,
+  tourneyAppearances: 0,
+  archetype: "Balanced",
 };
 
 const TEAM_PREFIXES = [
@@ -327,8 +349,8 @@ function generateAllTeams(): SeasonOpponent[] {
 }
 
 export const AVAILABLE_TEAMS = generateAllTeams();
-
-const SEASON_OPPONENTS: SeasonOpponent[] = AVAILABLE_TEAMS.slice(0, 100);
+const SEASON_OPPONENTS = AVAILABLE_TEAMS.slice(0, 20);
+const CONF_OPPONENTS = AVAILABLE_TEAMS.slice(20, 30);
 
 const CONFERENCES = [
   "Big East", "ACC", "SEC", "Big 10", "Big 12", "Pac 12", "Mountain West", "A-10", "AAC", "MAC",
@@ -371,6 +393,11 @@ export function makeOpponentTeam(opponent: SeasonOpponent): Team {
     year:      assignYear(idx),
     morale:    80 + rand(-5, 10),
     potential: 50 + rand(0, 40),
+    archetype: pickArchetype(pos),
+    traits:    pickTraits(pos),
+    heightInches: randomHeight(pos),
+    skinTone:  pickSkinTone(),
+    hairColor: pickHairColor(),
   }));
 
   return {
@@ -389,8 +416,7 @@ export function makeOpponentTeam(opponent: SeasonOpponent): Team {
 
 export function createInitialSeason(
   userTeam: Team,
-  coach: Coach,
-  settings: GameSettings
+  coach: Coach
 ): Season {
   const confName = CONFERENCES[Math.floor(Math.random() * CONFERENCES.length)];
   return {
@@ -412,18 +438,27 @@ export function createInitialSeason(
     recruitingClassRank: null,
     recruitingClassRating: 0,
     gamePlan: {
-      pace: "balanced",
-      focus: "balanced",
-      defensiveIntensity: "neutral",
+      pace: "Balanced",
+      focus: "Balanced",
+      defense: "Standard", benchUsage: 50,
     },
     recruitingPoints: 100,
     nilBudget: 50000,
     history: [],
-    postseasonStatus: null,
+    postseasonStatus: "none" as const,
     jobOffers: [],
     news: [],
     tournaments: [],
+    goals: generateInitialGoals(),
   };
+}
+
+function generateInitialGoals(): import("../types").SeasonGoal[] {
+  return [
+    { id: "goal_1", description: "Win 15+ Games", targetValue: 15, currentValue: 0, rewardXP: 500, type: "wins", completed: false },
+    { id: "goal_2", description: "Beat Rival Program", targetValue: 1, currentValue: 0, rewardXP: 300, type: "rival", completed: false },
+    { id: "goal_3", description: "Sign a 4-Star Recruit", targetValue: 1, currentValue: 0, rewardXP: 400, type: "recruiting", completed: false },
+  ];
 }
 
 export function generateConferenceTournament(confName: string, teams: Team[]): import("../types").Tournament {
@@ -726,26 +761,30 @@ export function createDefaultSeason(): Season {
     rank: null,
     top25: generateTop25(defaultHomeTeam, [...SEASON_OPPONENTS, ...CONF_OPPONENTS]),
     gamePlan: {
-      pace: "balanced",
-      focus: "balanced",
-      defensiveIntensity: "neutral",
+      pace: "Balanced",
+      focus: "Balanced",
+      defense: "Standard", benchUsage: 50,
     },
     recruitingPoints: 100,
     nilBudget: 50000,
     history: [],
-    postseasonStatus: null,
+    postseasonStatus: "none" as const,
+    jobOffers: [],
+    recruitingClassRank: null,
+    recruitingClassRating: 0,
+    tournaments: [],
+    goals: generateInitialGoals(),
     news: [{
       id: "news_start",
       week: 0,
-      category: "program",
+      category: "program" as const,
       headline: `${defaultCoach.firstName} ${defaultCoach.lastName} begins ${new Date().getFullYear()} campaign`,
       detail: "Season tips off. The journey to a conference title begins today.",
-      tone: "neutral",
+      tone: "neutral" as const,
     }],
   };
 }
 
-const REGIONS = ["West", "Midwest", "East", "South"] as const;
 const POSITIONS: PlayerPosition[] = ["PG", "SG", "SF", "PF", "C"];
 const ELITE_PROSPECT_MIN_RATING = 84;
 const ELITE_PROSPECT_MAX_RATING = 96;
@@ -810,6 +849,12 @@ export function generateProspects(
       skinTone: pickSkinTone(),
       hairColor: pickHairColor(),
       nilOffer: 0,
+      priorities: {
+        nil: Math.random(),
+        playingTime: Math.random(),
+        prestige: Math.random(),
+        academic: Math.random(),
+      },
     });
   }
   return prospects;
@@ -860,26 +905,96 @@ export function developAndAdvancePlayer(player: Player, coachDevelopment: number
   };
 }
 
+/**
+ * Generate a pool of transfer candidates from other schools.
+ * These are older players (SO, JR, SR) who have already developed and have established ratings.
+ */
+export function generateTransfers(
+  prestige: number,
+  count = 15
+): Prospect[] {
+  const transfers: Prospect[] = [];
+  const prestigeFactor = prestige / 100;
+
+  for (let i = 0; i < count; i++) {
+    const position = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
+    // Transfers are generally more established than recruits
+    const rating = rand(65, 88); 
+    const region = REGIONS[Math.floor(Math.random() * REGIONS.length)];
+    
+    // Transfer interest is higher if your prestige is high or you have NIL
+    const interestLevel = Math.max(0.1, Math.min(0.9, 0.2 + prestigeFactor * 0.5 + (Math.random() - 0.5) * 0.3));
+
+    const pot = rating + rand(0, 10);
+    const potentialRange: [number, number] = [Math.max(0, pot - 8), Math.min(100, pot + 8)];
+    
+    const previousSchool = TEAM_NAMES[Math.floor(Math.random() * TEAM_NAMES.length)];
+
+    transfers.push({
+      id: `transfer_${uid()}`,
+      firstName: randomFirstName(),
+      lastName: randomLastName(),
+      position,
+      rating,
+      scouted: false,
+      region,
+      interestLevel,
+      nilOffer: 0,
+      offered: false,
+      committed: false,
+      potentialRange,
+      archetype: pickArchetype(position),
+      traits: pickTraits(position),
+      heightInches: randomHeight(position),
+      skinTone: pickSkinTone(),
+      hairColor: pickHairColor(),
+      isTransfer: true,
+      previousSchool,
+      priorities: {
+        nil: Math.random(),
+        playingTime: 0.4 + Math.random() * 0.5, // transfers prioritize PT more
+        prestige: Math.random(),
+        academic: Math.random() * 0.4,
+      },
+    });
+  }
+
+  return transfers;
+}
+
+/**
+ * Convert a signed prospect (HS or Transfer) into a rostered player.
+ */
 export function prospectToPlayer(prospect: Prospect, number: number): Player {
+  // If it's a transfer, they might be older. For simplicity, we'll make them random 2-4.
+  // Realistically we could store 'year' on Prospect too.
+  const yearRoll = Math.random();
+  const year: 1 | 2 | 3 | 4 = prospect.isTransfer 
+    ? (yearRoll > 0.6 ? 4 : yearRoll > 0.3 ? 3 : 2)
+    : 1;
+
   return {
-    id: uid(),
+    id: prospect.id,
     firstName: prospect.firstName,
     lastName: prospect.lastName,
     number,
     position: prospect.position,
-    year: 1,
     ratings: {
-      speed: prospect.rating,
-      shooting: prospect.rating,
-      passing: prospect.rating,
-      defense: prospect.rating,
-      rebounding: prospect.rating,
-      endurance: prospect.rating,
+      speed: prospect.rating + rand(-3, 3),
+      shooting: prospect.rating + rand(-3, 3),
+      passing: prospect.rating + rand(-3, 3),
+      defense: prospect.rating + rand(-3, 3),
+      rebounding: prospect.rating + rand(-3, 3),
+      endurance: rand(60, 90),
     },
-    morale: 85 + rand(-2, 5),
-    potential: prospect.rating + rand(-5, 15),
+    year,
+    morale: 85,
+    potential: (prospect.potentialRange[0] + prospect.potentialRange[1]) / 2,
     archetype: prospect.archetype,
     traits: prospect.traits,
+    heightInches: prospect.heightInches,
+    skinTone: prospect.skinTone,
+    hairColor: prospect.hairColor,
   };
 }
 

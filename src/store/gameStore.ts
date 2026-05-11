@@ -45,6 +45,10 @@ import {
   setupUserTeam,
   rand,
   getConferenceTeams,
+  generateConferenceTournament,
+  generateMainTournament,
+  generateInvitationalTournament,
+  generateTransfers,
   AVAILABLE_TEAMS,
 } from "../game/data/defaults";
 
@@ -140,8 +144,8 @@ export interface GameStore {
   scoutingPoints: number;
   /** Scout a prospect (costs 1 point; reveals true rating). */
   scoutProspect: (prospectId: string) => void;
-  /** Contact a prospect to increase interest. */
-  contactProspect: (prospectId: string) => void;
+  /** Contact a prospect with a specific pitch to increase interest. */
+  pitchProspect: (prospectId: string, pitch: "nil" | "playingTime" | "prestige" | "academic") => void;
   /** Offer an NIL package to a prospect. */
   offerNil: (prospectId: string, amount: number) => void;
   /** Offer a scholarship to a prospect. */
@@ -166,6 +170,8 @@ export interface GameStore {
   updateGamePlan: (plan: Partial<import("../game/types").GamePlan>) => void;
   /** Advance the current tournament by one round (simulates all games). */
   advanceTournamentRound: (tournamentId: string) => void;
+  /** Advance to the transfer portal phase. */
+  advanceToTransferPortal: () => void;
 }
 
 export const useGameStore = create<GameStore>((set) => ({
@@ -310,7 +316,7 @@ export const useGameStore = create<GameStore>((set) => ({
   // Season / Head Coach mode
   startSeason: (selectedTeam: Team, coach: Coach) =>
     set({ 
-      season: createInitialSeason(selectedTeam, coach, defaultGameSettings), 
+      season: createInitialSeason(selectedTeam, coach), 
       screen: "season",
       gameContext: "season",
       prospects: generateProspects(60, coach.recruiting, selectedTeam.region),
@@ -377,14 +383,26 @@ export const useGameStore = create<GameStore>((set) => ({
 
         const userOverall = computeTeamOverall(season.team);
         const prestigeBonus = game.isHome ? (season.prestige / 100) * 4 : 0;
-        const paceFactor = season.gamePlan.pace === "fast" ? 1.12 : season.gamePlan.pace === "slow" ? 0.88 : 1.0;
-        const baseline = 63;
-        const spread = 18;
+
+        // Strategy Modifiers
+        const paceFactor = season.gamePlan.pace === "Push" ? 1.15 : season.gamePlan.pace === "Relaxed" ? 0.85 : 1.0;
+        const focusBonus = season.gamePlan.focus === "Outside" ? season.coach.offense / 100 * 2 : season.gamePlan.focus === "Inside" ? season.coach.defense / 100 * 2 : 0;
+        const defenseBonus = season.gamePlan.defense === "Aggressive" ? 3 : season.gamePlan.defense === "Passive" ? -3 : 0;
+
+        // Badge/Trait Effects (NBA 2K inspired)
+        const userLineup = season.team.roster.filter(p => season.team.lineup.includes(p.id));
+        const hasFloorGeneral = userLineup.some(p => p.traits.includes("Floor General"));
+        const hasPostAnchor = userLineup.some(p => p.archetype === "Post Anchor");
+        
+        const badgeOffenseBonus = hasFloorGeneral ? 3 : 0;
+        const badgeDefenseBonus = hasPostAnchor ? 3 : 0;
+
+        const baseline = 65;
         const userScore = Math.round(
-          (baseline + (userOverall / 100) * spread + prestigeBonus + (Math.random() - 0.5) * 14) * paceFactor
+          (baseline + (userOverall / 100) * 20 + prestigeBonus + focusBonus + badgeOffenseBonus + (Math.random() - 0.5) * 12) * paceFactor
         );
         const oppScore = Math.round(
-          (baseline + (game.opponent.overall / 100) * spread + (Math.random() - 0.5) * 14) * paceFactor
+          (baseline + (game.opponent.overall / 100) * 20 - defenseBonus - badgeDefenseBonus + (Math.random() - 0.5) * 12) * paceFactor
         );
         const result: "win" | "loss" = userScore > oppScore ? "win" : "loss";
 
@@ -394,10 +412,25 @@ export const useGameStore = create<GameStore>((set) => ({
           i === idx ? { ...g, result, userScore, opponentScore: oppScore } : g
         );
 
+        const newWins = season.record.wins + (result === "win" ? 1 : 0);
         const newRecord = {
-          wins:   season.record.wins   + (result === "win"  ? 1 : 0),
+          wins: newWins,
           losses: season.record.losses + (result === "loss" ? 1 : 0),
         };
+
+        // Goal Tracking (NCAA 13/College Dynasty inspired)
+        let goalXpEarned = 0;
+        const updatedGoals = season.goals.map(goal => {
+          if (goal.completed) return goal;
+          let current = goal.currentValue;
+          if (goal.type === "wins") current = newWins;
+          
+          const isNowComplete = current >= goal.targetValue;
+          if (isNowComplete && !goal.completed) {
+            goalXpEarned += goal.rewardXP;
+          }
+          return { ...goal, currentValue: current, completed: isNowComplete };
+        });
 
         const newsItem: import("../game/types").NewsItem = generateGameNewsItem(
           game, result, userScore, oppScore, newRecord, idx + 1
@@ -409,6 +442,7 @@ export const useGameStore = create<GameStore>((set) => ({
             ...season,
             schedule: newSchedule,
             record: newRecord,
+            goals: updatedGoals,
             conferenceRecord: isConfGame ? {
               wins:   season.conferenceRecord.wins   + (result === "win"  ? 1 : 0),
               losses: season.conferenceRecord.losses + (result === "loss" ? 1 : 0),
@@ -421,7 +455,7 @@ export const useGameStore = create<GameStore>((set) => ({
                 careerWins: season.coach.careerWins + (result === "win" ? 1 : 0),
                 careerLosses: season.coach.careerLosses + (result === "loss" ? 1 : 0),
               },
-              calculateCoachXP(season, result, game.opponent.overall)
+              calculateCoachXP(season, result, game.opponent.overall) + goalXpEarned
             ),
             ...calculateRankingsUpdate(season, result),
             news: [newsItem, ...(season.news ?? [])].slice(0, 50),
@@ -543,7 +577,7 @@ export const useGameStore = create<GameStore>((set) => ({
       if (!season) return state;
 
       const offers = generateJobOffers(season.coach, season.team.id);
-      const initialProspects = generateProspects(20, season.prestige);
+      const initialProspects = generateProspects(season.prestige, season.coach.recruiting, season.team.region);
 
       return {
         screen: offers.length > 0 ? "jobOffers" : "recruiting",
@@ -588,22 +622,25 @@ export const useGameStore = create<GameStore>((set) => ({
       };
     }),
 
-  contactProspect: (prospectId: string) =>
+  pitchProspect: (prospectId, pitch) =>
     set((state) => {
-      const { season, scoutingPoints } = state;
-      if (!season || scoutingPoints < 1) return state;
-
-      const coachSkillBonus = season.coach.recruiting / 100; 
-      const traitBonus = season.coach.traits.includes("Recruiting Magnet") ? 0.03 : 0;
-      const baseBoost = 0.08 + (coachSkillBonus * 0.05) + traitBonus;
+      const { season } = state;
+      if (!season || season.recruitingPoints < 5) return state;
 
       return {
-        scoutingPoints: scoutingPoints - 1,
-        prospects: state.prospects.map((p) =>
-          p.id === prospectId 
-            ? { ...p, interestLevel: Math.min(0.99, p.interestLevel + baseBoost) } 
-            : p
-        ),
+        season: {
+          ...season,
+          recruitingPoints: season.recruitingPoints - 5,
+        },
+        prospects: state.prospects.map((p) => {
+          if (p.id === prospectId) {
+            const priorityVal = p.priorities[pitch];
+            const coachBonus = season.coach.recruiting / 100;
+            const boost = (0.05 + priorityVal * 0.12) * (1 + coachBonus * 0.5);
+            return { ...p, interestLevel: Math.min(1, p.interestLevel + boost) };
+          }
+          return p;
+        }),
       };
     }),
 
@@ -692,7 +729,7 @@ export const useGameStore = create<GameStore>((set) => ({
 
         if (isSeasonEnd) {
           // Transition to Conference Tournament
-          const confTeams = getConferenceTeams(season.conferenceName);
+          const confTeams = getConferenceTeams(season.conferenceName).map(makeOpponentTeam);
           const confTourney = generateConferenceTournament(season.conferenceName, confTeams);
           
           return {
@@ -721,10 +758,21 @@ export const useGameStore = create<GameStore>((set) => ({
   },
 
   finishRecruiting: () =>
-    set((state) => {
+    set((state): Partial<GameStore> => {
       const { season, prospects } = state;
       if (!season) return state;
 
+      // If we are in HS recruiting, move to Transfer Portal
+      if (state.screen === "recruiting") {
+        const transfers = generateTransfers(season.prestige);
+        return {
+          screen: "transfer-portal",
+          prospects: transfers,
+          scoutingPoints: 5,
+        };
+      }
+
+      // If we are in Transfer Portal, finish the off-season
       // 1. Save History
       const historyEntry: import("../game/types").SeasonHistory = {
         year: season.year,
@@ -737,12 +785,10 @@ export const useGameStore = create<GameStore>((set) => ({
       const updatedHistory = [...season.coach.history, historyEntry];
 
       // 2. Graduate Seniors & Age Players
-      const YEAR_ORDER: import("../game/types").PlayerYear[] = ["FR", "SO", "JR", "SR"];
       const agedRoster = season.team.roster
-        .filter(p => p.year !== "SR") // Graduate
+        .filter(p => p.year !== 4) // Graduate seniors
         .map(p => {
-          const nextIdx = YEAR_ORDER.indexOf(p.year) + 1;
-          const nextYear = YEAR_ORDER[nextIdx];
+          const nextYear = Math.min(4, (p.year as number) + 1) as 1 | 2 | 3 | 4;
           
           // Player Development logic
           const devBonus = (season.coach.development / 100) * 3;
@@ -757,6 +803,7 @@ export const useGameStore = create<GameStore>((set) => ({
               passing: Math.min(99, p.ratings.passing + randomJump),
               defense: Math.min(99, p.ratings.defense + randomJump * 0.8),
               rebounding: Math.min(99, p.ratings.rebounding + randomJump * 0.8),
+              endurance: Math.min(99, p.ratings.endurance + randomJump * 0.5),
             }
           };
         });
@@ -795,7 +842,7 @@ export const useGameStore = create<GameStore>((set) => ({
           result: null,
           userScore: 0,
           opponentScore: 0,
-          gameType: "nc"
+          gameType: "non-conf"
         });
       });
       // 8 Conference
@@ -838,6 +885,18 @@ export const useGameStore = create<GameStore>((set) => ({
         prospects: [],
         scoutingPoints: 0,
         screen: "season" as Screen,
+      };
+    }),
+
+
+  upgradeNILCollective: () =>
+    set((state) => {
+      const { season } = state;
+      if (!season) return state;
+      const cost = (season.nilCollectiveLevel + 1) * 2000;
+      if (season.budget < cost) return state;
+      return {
+        season: { ...season, nilCollectiveLevel: season.nilCollectiveLevel + 1, budget: season.budget - cost, nilBudget: season.nilBudget + 15000 },
       };
     }),
 
@@ -892,10 +951,22 @@ export const useGameStore = create<GameStore>((set) => ({
         abbreviation: offer.teamId.substring(0, 3).toUpperCase(),
         primaryColor: "#333",
         secondaryColor: "#777",
-        region: "Midwest",
+        region: "Midwest" as const,
         chemistry: 70
       };
-      const newTeam = setupUserTeam(baseTeam, offer.prestige);
+      
+      const setupBase = {
+        id: baseTeam.id,
+        name: baseTeam.name,
+        nickname: (baseTeam as any).nickname || "Warriors",
+        abbreviation: baseTeam.abbreviation,
+        primaryColor: baseTeam.primaryColor,
+        secondaryColor: baseTeam.secondaryColor,
+        region: baseTeam.region,
+        chemistry: (baseTeam as any).chemistry ?? 70,
+      };
+
+      const newTeam = setupUserTeam(setupBase, offer.prestige);
 
       const updatedCoach: import("../game/types").Coach = {
         ...season.coach,
@@ -907,11 +978,12 @@ export const useGameStore = create<GameStore>((set) => ({
             year: season.year - 1,
             wins: season.record.wins,
             losses: season.record.losses,
+            postseason: season.postseasonStatus ?? null,
           },
         ],
       };
 
-      const newSeason = createInitialSeason(newTeam, updatedCoach, state.settings);
+      const newSeason = createInitialSeason(newTeam, updatedCoach);
 
       return {
         season: {
@@ -1042,19 +1114,21 @@ export const useGameStore = create<GameStore>((set) => ({
     }, 800);
   },
 
-  upgradeNILCollective: () =>
+  advanceToTransferPortal: () =>
     set((state) => {
       const { season } = state;
-      if (!season || season.nilCollectiveLevel >= 10) return state;
-      const cost = 2500 + season.nilCollectiveLevel * 1500;
-      if (season.budget < cost) return state;
+      if (!season) return state;
 
+      const transfers = generateTransfers(season.prestige);
+      
       return {
+        screen: "transfer-portal",
+        prospects: transfers,
+        scoutingPoints: 5,
         season: {
           ...season,
-          budget: season.budget - cost,
-          nilCollectiveLevel: season.nilCollectiveLevel + 1,
-        },
+          recruitingPoints: 50,
+        }
       };
     }),
 }));

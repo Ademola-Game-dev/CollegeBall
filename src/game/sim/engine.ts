@@ -175,8 +175,6 @@ export function createInitialSimState(
         hasBall: false,
         speedFactor: speedFactorFromRating(ratings.speed),
         ratings,
-        morale: 100,
-        teamRank: 1,
         fouls: 0,
         stamina: 100,
         chemistry: homeTeam.chemistry,
@@ -247,11 +245,7 @@ export function createInitialSimState(
   });
 
   const ballHandler = players[0];
-
-  // Assign warm-up targets initially
-  assignWarmupTargets(players);
-
-  return {
+  const state: SimulationState = {
     phase: "PRE_GAME",
     players,
     bench,
@@ -274,6 +268,11 @@ export function createInitialSimState(
     teamChemistry: { home: homeTeam.chemistry, away: awayTeam.chemistry },
     events: [],
   };
+
+  // Assign warm-up targets initially
+  assignWarmupTargets(players);
+
+  return state;
 }
 
 // ---------------------------------------------------------------------------
@@ -454,10 +453,11 @@ function findOpenTeammate(players: SimPlayer[], selfId: string, teamId: Possessi
 
 /** Assign new offensive/defensive targets for all players. */
 function assignTargets(
-  players: SimPlayer[],
+  state: SimulationState,
   possessionTeam: PossessionTeam,
   ballHandlerId?: string | null
 ): void {
+  const players = state.players;
   const offTeam = possessionTeam;
   const defTeam: PossessionTeam = possessionTeam === "home" ? "away" : "home";
   const attackRight = possessionTeam === "home";
@@ -541,13 +541,13 @@ function assignTargets(
       }
     }
 
-    const dx = basket.x - targetAnchor.x;
-    const dy = basket.y - targetAnchor.y;
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const hdx = basket.x - targetAnchor.x;
+    const hdy = basket.y - targetAnchor.y;
+    const hlen = Math.sqrt(hdx * hdx + hdy * hdy) || 1;
 
     def.targetPosition = clampToCourt({
-      x: targetAnchor.x + (dx / len) * guardDist + (Math.random() - 0.5) * 2,
-      y: targetAnchor.y + (dy / len) * guardDist + (Math.random() - 0.5) * 2,
+      x: targetAnchor.x + (hdx / hlen) * guardDist + (Math.random() - 0.5) * 2,
+      y: targetAnchor.y + (hdy / hlen) * guardDist + (Math.random() - 0.5) * 2,
     });
   });
 }
@@ -727,7 +727,7 @@ export function tick(
 
       // Reassign movement targets periodically
       if (state._timeSinceLastTargetAssign > 2.5) {
-        assignTargets(state.players, state.possession.team, state.possession.ballHandlerId);
+        assignTargets(state, state.possession.team, state.possession.ballHandlerId);
         state._timeSinceLastTargetAssign = 0;
       }
 
@@ -786,7 +786,7 @@ function tickClocks(ctx: TickContext): void {
         ctx.events.push({ type: "half_end", message: "HALFTIME" });
 
         // Re-calculate positions for side swap (home now attacks left)
-        assignTargets(state.players, state.possession.team, state.possession.ballHandlerId);
+        assignTargets(state, state.possession.team, state.possession.ballHandlerId);
       } else {
         state.phase = "FULL_TIME";
         state.gameClock.running = false;
@@ -807,7 +807,7 @@ function tickClocks(ctx: TickContext): void {
           const otTeam: PossessionTeam = state.possession.team === "home" ? "away" : "home";
           state.possession.team = otTeam;
           inboundBallHandler(state, otTeam, null);
-          assignTargets(state.players, otTeam, state.possession.ballHandlerId);
+          assignTargets(state, otTeam, state.possession.ballHandlerId);
           ctx.events.push({
             type: "overtime_start",
             message: state.overtimePeriod === 1 ? "Tied game — OVERTIME!" : `Still tied — OT${state.overtimePeriod}!`,
@@ -911,12 +911,12 @@ function tickBallHandler(ctx: TickContext): void {
       ? COACH_OFF_MIN_MULT + (settings.coachOffense / 100) * COACH_OFF_RANGE
       : 1.0;
 
-  // Game Plan Pace: "fast" pushes tempo; "slow" forces patience (OOTP/Football Coach logic).
-  const paceMult = settings.gamePlan?.pace === "fast" ? 1.4 : settings.gamePlan?.pace === "slow" ? 0.7 : 1.0;
+  // Game Plan Pace: "Push" pushes tempo; "Relaxed" forces patience (OOTP/Football Coach logic).
+  const paceMult = settings.gamePlan?.pace === "Push" ? 1.4 : settings.gamePlan?.pace === "Relaxed" ? 0.7 : 1.0;
 
-  // Game Plan Focus: "perimeter" increases shot chance from deep; "interior" decreases it (prefers pass/drive).
-  const focusMult = (settings.gamePlan?.focus === "perimeter" && distToBasket > 20) ? 1.25 : 
-                    (settings.gamePlan?.focus === "interior" && distToBasket > 20) ? 0.75 : 1.0;
+  // Game Plan Focus: "Outside" increases shot chance from deep; "Inside" decreases it (prefers pass/drive).
+  const focusMult = (settings.gamePlan?.focus === "Outside" && distToBasket > 20) ? 1.25 : 
+                    (settings.gamePlan?.focus === "Inside" && distToBasket > 20) ? 0.75 : 1.0;
 
   const effectiveShotChance =
     SHOT_CHANCE_PER_SECOND * shootingBias * distFactor * shotClockPressure * fastBreakMult * coachOffMult * paceMult * focusMult * dt;
@@ -1465,7 +1465,7 @@ function resolveRebound(ctx: TickContext, basketPos: CourtPosition): void {
     state.shotClock.remaining = settings.shotClockLength;
     state._timeSinceLastAction = 0;
     state._timeSinceLastTargetAssign = 0;
-    assignTargets(state.players, rebounder.teamId, rebounder.id);
+    assignTargets(state, rebounder.teamId, rebounder.id);
 
     // Fast-break opportunity: if fewer than 2 opponents are goal-side of the rebounder
     // the rebounding team can push ahead in transition.
@@ -1532,7 +1532,7 @@ function executePass(ctx: TickContext, from: SimPlayer, to: SimPlayer): void {
         state._lastPassFromId = undefined;
         nearestDef.player.hasBall = true;
         state.possession.ballHandlerId = nearestDef.player.id;
-        assignTargets(state.players, nearestDef.player.teamId, nearestDef.player.id);
+        assignTargets(state, nearestDef.player.teamId, nearestDef.player.id);
 
         if (state.playerStats[nearestDef.player.id]) {
           state.playerStats[nearestDef.player.id].steals += 1;
@@ -1629,7 +1629,7 @@ function changePossession(ctx: TickContext): void {
   inboundBallHandler(state, newTeam, prevHandler);
 
   // Reassign targets for the new possession
-  assignTargets(state.players, newTeam, state.possession.ballHandlerId);
+  assignTargets(state, newTeam, state.possession.ballHandlerId);
 
   ctx.events.push({ type: "possession_change", message: `${newTeam} ball` });
 }
@@ -1715,7 +1715,7 @@ function tickSubstitutions(ctx: TickContext): void {
     });
 
     // Re-assign targets after the lineup change
-    assignTargets(state.players, state.possession.team, state.possession.ballHandlerId);
+    assignTargets(state, state.possession.team, state.possession.ballHandlerId);
     state._timeSinceLastTargetAssign = 0;
   }
 }
