@@ -231,6 +231,8 @@ export interface SimulationState {
   _hotStreak?: Record<string, number>;
   /** Internal: drives the procedural dribble bounce animation. */
   _dribbleTime: number;
+  /** Team momentum (0–100). Higher momentum provides a small ratings boost. */
+  momentum: { home: number; away: number };
   /** Event log for the current tick (e.g. "shot_made", "turnover"). */
   events: SimEvent[];
 }

@@ -270,6 +270,7 @@ export function createInitialSimState(
     _isFastBreak: false,
     _hotStreak: {},
     _dribbleTime: 0,
+    momentum: { home: 50, away: 50 },
     teamChemistry: { home: homeTeam.chemistry, away: awayTeam.chemistry },
     events: [],
   };
@@ -481,6 +482,18 @@ function assignTargets(
       return;
     }
 
+    // Off-ball motion: occasionally cut to the basket or relocate to open space
+    const isBig = p.slotIndex >= 3; // PF/C
+    const canCut = !state.shotInFlight && state.shotClock.remaining > 5;
+    
+    if (canCut && Math.random() < 0.15) {
+      // Cut to basket
+      const cutDepth = isBig ? 2 : 5;
+      const cutX = attackRight ? basket.x - cutDepth : basket.x + cutDepth;
+      p.targetPosition = clampToCourt({ x: cutX, y: (Math.random() - 0.5) * 6 });
+      return;
+    }
+
     const slotIdx = p.slotIndex % OFFENSE_SLOTS.length;
     const slot = OFFENSE_SLOTS[slotIdx];
     const jitter: CourtPosition = {
@@ -513,11 +526,28 @@ function assignTargets(
 
     // Defender is tighter on the ball handler (closer coverage)
     const isBallHandler = matchup.id === ballHandlerId;
-    const guardDist = isBallHandler ? 1.5 + Math.random() * 1 : 3 + Math.random() * 3;
+    const handler = offPlayers.find(o => o.id === ballHandlerId);
+    
+    let targetAnchor = matchup.position;
+    let guardDist = isBallHandler ? 1.5 + Math.random() * 1 : 4 + Math.random() * 2;
+
+    // Help Defense: if ball handler is in the paint, nearby defenders (especially bigs) collapse
+    if (!isBallHandler && handler) {
+      const distToBasket = distance(handler.position, basket);
+      const defDistToHandler = distance(def.position, handler.position);
+      if (distToBasket < 16 && defDistToHandler < 15 && (def.slotIndex >= 3 || Math.random() < 0.3)) {
+        targetAnchor = handler.position;
+        guardDist = 3.5 + Math.random() * 2;
+      }
+    }
+
+    const dx = basket.x - targetAnchor.x;
+    const dy = basket.y - targetAnchor.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
 
     def.targetPosition = clampToCourt({
-      x: matchup.position.x + (dx / len) * guardDist + (Math.random() - 0.5) * 2,
-      y: matchup.position.y + (dy / len) * guardDist + (Math.random() - 0.5) * 2,
+      x: targetAnchor.x + (dx / len) * guardDist + (Math.random() - 0.5) * 2,
+      y: targetAnchor.y + (dy / len) * guardDist + (Math.random() - 0.5) * 2,
     });
   });
 }
@@ -717,6 +747,10 @@ export function tick(
   tickBallPosition(ctx);
 
   state.events = ctx.events;
+  // ── Team Momentum decay ──────────────────────────────────────────────────
+  state.momentum.home += (50 - state.momentum.home) * dt * 0.02;
+  state.momentum.away += (50 - state.momentum.away) * dt * 0.02;
+
   return state;
 }
 
@@ -1201,6 +1235,11 @@ function resolveShotInFlight(ctx: TickContext): void {
       }
     }
 
+    // Momentum boost: ±0.04 range based on team momentum
+    const teamMom = state.momentum[state.possession.team];
+    const momBoost = ((teamMom - 50) / 50) * 0.04;
+    makeProb = Math.max(MIN_SHOT_PROBABILITY, Math.min(MAX_LAYUP_PROBABILITY, makeProb + momBoost));
+
     // Home-court advantage: boost based on crowd and chemistry synergy
     if (ctx.settings.homeCourtBonus && state.possession.team === "home") {
       const hfa = HOME_COURT_SHOT_BONUS + (state.teamChemistry.home / 100) * 0.01;
@@ -1295,6 +1334,12 @@ function resolveShotInFlight(ctx: TickContext): void {
         resolveFreeThrows(ctx, shooter, isThreePointer ? 3 : 2, state.possession.team);
       }
 
+      if (made) {
+        updateMomentum(state, state.possession.team, isThreePointer ? 8 : 6);
+      } else {
+        updateMomentum(state, state.possession.team, -3);
+      }
+
       // After FTs the defending team inbounds — treat as a possession change
       changePossession(ctx);
       state.shotClock.remaining = settings.shotClockLength;
@@ -1319,9 +1364,9 @@ function resolveShotInFlight(ctx: TickContext): void {
         playerId: shooter?.id,
         teamId: state.possession.team,
         points: pts,
-        message: `${pts}-point basket!`,
+        message: `${pts}-pt shot made!`,
       });
-      // Made basket → change possession, reset shot clock
+      updateMomentum(state, state.possession.team, pts === 3 ? 6 : 4);
       changePossession(ctx);
       state.shotClock.remaining = settings.shotClockLength;
     } else {
@@ -1359,6 +1404,7 @@ function resolveShotInFlight(ctx: TickContext): void {
         teamId: state.possession.team,
         message: blocked ? "Shot blocked!" : "Shot missed!",
       });
+      updateMomentum(state, state.possession.team, -3);
       // Missed shot → contest the rebound
       resolveRebound(ctx, target);
     }
@@ -1691,6 +1737,12 @@ function tickBallPosition(ctx: TickContext): void {
     // Ball is loose or in transition
     state.ballHeight = Math.max(0.4, state.ballHeight - dt * 5);
   }
+}
+
+function updateMomentum(state: SimulationState, team: PossessionTeam, amount: number): void {
+  const otherTeam = team === "home" ? "away" : "home";
+  state.momentum[team] = Math.max(0, Math.min(100, state.momentum[team] + amount));
+  state.momentum[otherTeam] = Math.max(0, Math.min(100, state.momentum[otherTeam] - amount));
 }
 
 /** No longer needed as accumulators are part of SimulationState. */
