@@ -156,6 +156,8 @@ export interface PlayerVisualConfig {
   isHome: boolean;
   number: number;
   heightInches: number;
+  skinTone: number;
+  hairColor: string;
 }
 
 export interface PlayerVisualEntity {
@@ -233,12 +235,9 @@ const SKIN_TONES: Color3[] = [
   new Color3(0.32, 0.20, 0.10), // deep
 ];
 
-function skinToneForId(id: string): Color3 {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  }
-  return SKIN_TONES[hash % SKIN_TONES.length];
+function skinToneForIndex(index: number): Color3 {
+  const i = Math.max(0, Math.min(SKIN_TONES.length - 1, index - 1));
+  return SKIN_TONES[i];
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +259,8 @@ function createPrimitiveFallback(
   const shortsHex   = isHome ? team.secondaryColor  : team.primaryColor;
   const jerseyColor = parseHexColor(jerseyHex);
   const shortsColor = parseHexColor(shortsHex);
-  const skinColor   = skinToneForId(id);
+  const skinColor   = skinToneForIndex(config.skinTone);
+  const hairColor   = parseHexColor(config.hairColor);
 
   // Slightly glossy materials for the jersey/shorts
   const shortsMat = cachedMat(
@@ -270,7 +270,8 @@ function createPrimitiveFallback(
     new Color3(0.12, 0.12, 0.12),
     24
   );
-  const skinMat = cachedMat(scene, `skin_${id}`, skinColor, new Color3(0.06, 0.04, 0.03), 12);
+  const skinMat = cachedMat(scene, `skin_${config.skinTone}`, skinColor, new Color3(0.06, 0.04, 0.03), 12);
+  const hairMat = cachedMat(scene, `hair_${config.hairColor}`, hairColor, new Color3(0.02, 0.02, 0.02), 8);
 
   // --- Shoes (flattened ellipsoid at the base) ---
   const shoe = MeshBuilder.CreateSphere(
@@ -336,9 +337,20 @@ function createPrimitiveFallback(
   head.material = skinMat;
   head.parent   = root;
 
+  // --- Hair (procedural cap) ---
+  const hair = MeshBuilder.CreateSphere(
+    `${prefix}_hair`,
+    { diameterX: 0.88, diameterY: 0.45, diameterZ: 0.88, segments: 6, slice: 0.5 },
+    scene
+  );
+  hair.position = new Vector3(0, 6.42, 0);
+  hair.rotation.x = Math.PI; // flip to cover top
+  hair.material = hairMat;
+  hair.parent   = root;
+
   return {
     root,
-    meshes: [shoe, legs, torso, leftArm, rightArm, head],
+    meshes: [shoe, legs, torso, leftArm, rightArm, head, hair],
     torsoMesh: torso,
     headMesh: head,
   };

@@ -269,6 +269,7 @@ export function createInitialSimState(
     _timeSinceLastTargetAssign: 0,
     _isFastBreak: false,
     _hotStreak: {},
+    _dribbleTime: 0,
     teamChemistry: { home: homeTeam.chemistry, away: awayTeam.chemistry },
     events: [],
   };
@@ -1674,13 +1675,21 @@ function tickSubstitutions(ctx: TickContext): void {
 }
 
 function tickBallPosition(ctx: TickContext): void {
-  const { state } = ctx;
-  if (state.shotInFlight) return; // ball position handled by shot logic
+  const { state, dt } = ctx;
+  if (state.shotInFlight) return;
 
   const handler = state.players.find((p) => p.id === state.possession.ballHandlerId);
   if (handler) {
     state.ballPosition = { ...handler.position };
-    state.ballHeight = BALL_HELD_HEIGHT;
+    
+    // Dribble bounce: ~3.5 bounces per second (approx 22 rad/sec)
+    state._dribbleTime += dt * 22;
+    
+    const bounceHeight = Math.abs(Math.sin(state._dribbleTime));
+    state.ballHeight = 0.4 + bounceHeight * 2.6; // 0.4ft (floor) to 3.0ft (hand)
+  } else {
+    // Ball is loose or in transition
+    state.ballHeight = Math.max(0.4, state.ballHeight - dt * 5);
   }
 }
 

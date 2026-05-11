@@ -504,12 +504,17 @@ function NextGameCard({ game, onPlay, onSim }: NextGameCardProps) {
             vs {game.opponent.abbreviation}
           </h2>
           <p className="mt-1 text-sm text-white/60">{game.opponent.name}</p>
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/55">
-            <span
-              className="h-2 w-2 rounded-full"
-              style={{ backgroundColor: game.opponent.primaryColor }}
-            />
-            Opponent strength: {game.opponent.overall}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/55">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: game.opponent.primaryColor }}
+              />
+              OVR: {game.opponent.overall}
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-200/60">
+              Scouting: {game.opponent.overall > 80 ? "Elite Frontcourt" : game.opponent.overall > 70 ? "Balanced Attack" : "Rebuilding"}
+            </div>
           </div>
         </div>
 
@@ -691,8 +696,11 @@ function RosterRow({ player: p, isBench = false, stats, gamesPlayed = 0 }: Roste
 
       {/* Name + Archetype */}
       <div className="flex flex-1 flex-col">
-        <div className={`text-sm font-semibold ${isBench ? "text-white/55" : "text-white/85"}`}>
-          {p.firstName[0]}. {p.lastName}
+        <div className={`text-sm font-semibold flex items-baseline gap-2 ${isBench ? "text-white/55" : "text-white/85"}`}>
+          <span>{p.firstName[0]}. {p.lastName}</span>
+          <span className="text-[10px] font-medium text-white/20 tabular-nums">
+            {Math.floor(p.heightInches / 12)}'{p.heightInches % 12}"
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[9px] font-medium uppercase tracking-widest text-white/25">{p.archetype}</span>

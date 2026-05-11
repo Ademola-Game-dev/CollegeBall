@@ -76,6 +76,8 @@ export interface Player {
   /** Unique characteristics that provide specific situational boosts. */
   traits: PlayerTrait[];
   heightInches: number;
+  skinTone: number;
+  hairColor: string;
 }
 
 export type PlayerPosition = "PG" | "SG" | "SF" | "PF" | "C";
@@ -227,6 +229,8 @@ export interface SimulationState {
   _isFastBreak?: boolean;
   /** Internal: per-player consecutive-makes counter for the hot-hand effect. */
   _hotStreak?: Record<string, number>;
+  /** Internal: drives the procedural dribble bounce animation. */
+  _dribbleTime: number;
   /** Event log for the current tick (e.g. "shot_made", "turnover"). */
   events: SimEvent[];
 }
@@ -503,6 +507,8 @@ export interface Prospect {
   /** Unique characteristics. */
   traits: PlayerTrait[];
   heightInches: number;
+  skinTone: number;
+  hairColor: string;
 }
 
 /** Letter grade derived from a prospect's rating (if not yet scouted). */

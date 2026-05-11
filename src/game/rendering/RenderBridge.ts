@@ -112,13 +112,17 @@ export class RenderBridge {
       const playerData = allPlayers.find((p) => p.id === sp.id);
       const number     = playerData?.number ?? 0;
       const heightInches = playerData?.heightInches ?? 78;
+      const skinTone = playerData?.skinTone ?? 1;
+      const hairColor = playerData?.hairColor ?? "#1a1a1a";
 
       const visual = createPlayerVisual(this.scene, { 
         id: sp.id, 
         team, 
         isHome, 
         number, 
-        heightInches 
+        heightInches,
+        skinTone,
+        hairColor
       });
 
       this.playerVisuals.set(sp.id, visual);

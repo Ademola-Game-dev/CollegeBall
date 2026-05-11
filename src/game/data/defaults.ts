@@ -58,6 +58,15 @@ function randomHeight(pos: PlayerPosition): number {
   return rand(...ranges[pos]);
 }
 
+function pickSkinTone(): number {
+  return rand(1, 5);
+}
+
+function pickHairColor(): string {
+  const colors = ["#2d1b0d", "#1a1a1a", "#4a3728", "#8b5a2b", "#d2b48c"];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
 function makeRatings(pos: PlayerPosition): import("../types").PlayerRatings {
   const r = RATING_RANGES[pos];
   return {
@@ -130,6 +139,8 @@ function makePlayers(
     archetype: pickArchetype(pos),
     traits: pickTraits(pos),
     heightInches: randomHeight(pos),
+    skinTone: pickSkinTone(),
+    hairColor: pickHairColor(),
   }));
 }
 
@@ -446,6 +457,8 @@ export function generateProspects(
       archetype: pickArchetype(position),
       traits: pickTraits(position),
       heightInches: randomHeight(position),
+      skinTone: pickSkinTone(),
+      hairColor: pickHairColor(),
     });
   }
   return prospects;
