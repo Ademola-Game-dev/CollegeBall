@@ -50,8 +50,8 @@ const MIN_DELTA_TIME = 0.0001;
  * Visual smoothing time constants (seconds to close ~63% of the gap).
  * Framerate-independent: applied via exponential decay each frame.
  */
-const PLAYER_POS_SMOOTHING_SEC = 0.12;
-const BALL_POS_SMOOTHING_SEC = 0.12;
+const PLAYER_POS_SMOOTHING_SEC = 0.07;
+const BALL_POS_SMOOTHING_SEC = 0.07;
 
 /**
  * Per-frame lerp factor for player facing angle at 60 FPS reference.

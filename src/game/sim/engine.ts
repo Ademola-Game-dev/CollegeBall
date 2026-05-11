@@ -1117,7 +1117,7 @@ function resolveShotInFlight(ctx: TickContext): void {
   // Animate ball along a clean arc from origin → basket
   const t = 1 - Math.max(0, newTimer / SHOT_FLIGHT_TIME); // 0 at release, 1 at basket
   state.ballPosition = lerpPosition(origin, target, t);
-  state.ballHeight = BALL_HELD_HEIGHT + Math.sin(t * Math.PI) * 10; // arc peaks ~13.5 ft
+  state.ballHeight = BALL_HELD_HEIGHT + Math.sin(t * Math.PI) * 14; // arc peaks ~17.5 ft
 
   if (newTimer <= 0) {
     // Shot has arrived — resolve make/miss

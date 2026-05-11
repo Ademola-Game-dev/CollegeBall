@@ -68,9 +68,9 @@ const MODE_CONFIGS: Record<CameraMode, ModeConfig> = {
 };
 
 /** Lerp factor for smooth mode transitions (alpha/beta/radius). */
-const TRANSITION_SPEED = 0.06;
+const TRANSITION_SPEED = 0.12;
 /** Lerp factor applied to camera target position each frame. */
-const TARGET_SMOOTHING = 0.08;
+const TARGET_SMOOTHING = 0.15;
 
 // ---------------------------------------------------------------------------
 // BroadcastCamera
