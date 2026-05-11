@@ -155,6 +155,7 @@ export interface PlayerVisualConfig {
   team: Team;
   isHome: boolean;
   number: number;
+  heightInches: number;
 }
 
 export interface PlayerVisualEntity {
@@ -167,6 +168,7 @@ export interface PlayerVisualEntity {
   headMesh: Mesh;
   glbController: GlbAnimationController | null;
   glbLoaded: boolean;
+  heightInches: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +253,8 @@ function createPrimitiveFallback(
   const prefix = `plr_${id}`;
 
   const root = new TransformNode(`${prefix}_root`, scene);
+  const heightFactor = config.heightInches / 78; // Base scale at 6'6"
+  root.scaling = new Vector3(heightFactor, heightFactor, heightFactor);
 
   const jerseyHex   = isHome ? team.primaryColor   : team.secondaryColor;
   const shortsHex   = isHome ? team.secondaryColor  : team.primaryColor;
@@ -274,7 +278,7 @@ function createPrimitiveFallback(
     { diameterX: 0.85, diameterY: 0.32, diameterZ: 0.52, segments: 6 },
     scene
   );
-  shoe.position = new Vector3(0, 0.16, 0);
+  shoe.position = new Vector3(0, 0.20, 0);
   const shoeMat = cachedMat(scene, `shoe_${team.id}`, new Color3(0.12, 0.12, 0.14), new Color3(0.12, 0.12, 0.14), 32);
   shoe.material = shoeMat;
   shoe.parent   = root;
@@ -282,20 +286,20 @@ function createPrimitiveFallback(
   // --- Legs ---
   const legs = MeshBuilder.CreateCylinder(
     `${prefix}_legs`,
-    { height: 1.65, diameterTop: 0.74, diameterBottom: 0.64, tessellation: 10 },
+    { height: 2.8, diameterTop: 0.70, diameterBottom: 0.50, tessellation: 10 },
     scene
   );
-  legs.position = new Vector3(0, 1.1, 0);
+  legs.position = new Vector3(0, 1.8, 0);
   legs.material = shortsMat;
   legs.parent   = root;
 
   // --- Torso (jersey) ---
   const torso = MeshBuilder.CreateCylinder(
     `${prefix}_torso`,
-    { height: 1.75, diameterTop: 0.92, diameterBottom: 0.76, tessellation: 10 },
+    { height: 2.6, diameterTop: 0.88, diameterBottom: 0.70, tessellation: 10 },
     scene
   );
-  torso.position = new Vector3(0, 2.50, 0);
+  torso.position = new Vector3(0, 4.3, 0);
   torso.material = buildNumberMaterial(scene, `${prefix}_jersey`, number, jerseyColor, shortsHex);
   torso.parent   = root;
 
@@ -308,27 +312,27 @@ function createPrimitiveFallback(
     scene
   );
   leftArm.rotation.z = Math.PI / 2;
-  leftArm.position = new Vector3(0, 3.15, 0.55);
+  leftArm.position = new Vector3(0, 5.2, 0.60);
   leftArm.material = armMat;
   leftArm.parent   = root;
 
   const rightArm = MeshBuilder.CreateCylinder(
     `${prefix}_armR`,
-    { height: 0.70, diameter: 0.26, tessellation: 8 },
+    { height: 0.90, diameter: 0.24, tessellation: 8 },
     scene
   );
   rightArm.rotation.z = Math.PI / 2;
-  rightArm.position = new Vector3(0, 3.15, -0.55);
+  rightArm.position = new Vector3(0, 5.2, -0.60);
   rightArm.material = armMat;
   rightArm.parent   = root;
 
   // --- Head ---
   const head = MeshBuilder.CreateSphere(
     `${prefix}_head`,
-    { diameterX: 0.70, diameterY: 0.72, diameterZ: 0.68, segments: 8 },
+    { diameterX: 0.85, diameterY: 0.95, diameterZ: 0.85, segments: 8 },
     scene
   );
-  head.position = new Vector3(0, 3.75, 0);
+  head.position = new Vector3(0, 6.0, 0);
   head.material = skinMat;
   head.parent   = root;
 
@@ -426,6 +430,7 @@ export function createPlayerVisual(
     animState:     { name: "idle", elapsed: 0, blendIn: 1, prevName: null },
     glbController: null,
     glbLoaded:     false,
+    heightInches:  config.heightInches,
     ...parts,
   };
 }
@@ -434,7 +439,7 @@ export function createPlayerVisual(
 // GLB async upgrade
 // ---------------------------------------------------------------------------
 
-const GLB_PLAYER_SCALE = 3.5;
+const GLB_PLAYER_SCALE = 1.05;
 
 export async function loadGlbForPlayer(
   scene: Scene,
@@ -450,7 +455,9 @@ export async function loadGlbForPlayer(
 
     if (!result.meshes.length) return;
 
-    entity.root.scaling = new Vector3(GLB_PLAYER_SCALE, GLB_PLAYER_SCALE, GLB_PLAYER_SCALE);
+    const heightFactor = entity.heightInches ? entity.heightInches / 78 : 1.0;
+    const finalScale = GLB_PLAYER_SCALE * heightFactor;
+    entity.root.scaling = new Vector3(finalScale, finalScale, finalScale);
 
     for (const mesh of result.meshes) {
       if (!mesh.parent) {
@@ -498,7 +505,7 @@ export function updatePlayerVisual(
 
     entity.root.position.y = bob;
     entity.root.rotation.z = lean;
-    entity.headMesh.position.y = 3.75 + armRaise * HEAD_ARM_RAISE_MAX;
+    entity.headMesh.position.y = 6.0 + armRaise * HEAD_ARM_RAISE_MAX;
   }
 }
 

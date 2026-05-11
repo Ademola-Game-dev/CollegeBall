@@ -27,6 +27,23 @@ export interface WorldPosition {
 // Players & Teams
 // ---------------------------------------------------------------------------
 
+export type PlayerArchetype = 
+  | "Pass-First PG" 
+  | "Scoring Guard" 
+  | "Wing Sniper" 
+  | "Two-Way Wing" 
+  | "Stretch Big" 
+  | "Glass Cleaner" 
+  | "Post Anchor";
+
+export type PlayerTrait = 
+  | "Clutch" 
+  | "Floor General" 
+  | "Brick Wall" 
+  | "Microwave" 
+  | "Enforcer"
+  | "High Motor";
+
 /** Placeholder player ratings — will grow as systems are added. */
 export interface PlayerRatings {
   speed: number; // 0–100
@@ -50,6 +67,15 @@ export interface Player {
    * and are replaced via recruiting.
    */
   year: 1 | 2 | 3 | 4;
+  /** Player morale (0–100). Influenced by playing time and team success. */
+  morale: number;
+  /** Hidden potential (0–100). Higher potential allows for greater off-season development. */
+  potential: number;
+  /** Primary playing style. Affects how ratings translate to sim behavior. */
+  archetype: PlayerArchetype;
+  /** Unique characteristics that provide specific situational boosts. */
+  traits: PlayerTrait[];
+  heightInches: number;
 }
 
 export type PlayerPosition = "PG" | "SG" | "SF" | "PF" | "C";
@@ -60,11 +86,16 @@ export type Lineup = [string, string, string, string, string];
 export interface Team {
   id: string;
   name: string;
+  nickname: string;
   abbreviation: string;
   primaryColor: string;
   secondaryColor: string;
   roster: Player[];
   lineup: Lineup;
+  /** Team chemistry (0–100). Higher values boost simulation performance. */
+  chemistry: number;
+  /** Geographic region (for recruiting interest bias). */
+  region: "West" | "Midwest" | "East" | "South";
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +159,8 @@ export interface SimPlayer {
   fouls: number;
   /** Current stamina (0–100). Drains during play; low stamina penalises speed/shooting. */
   stamina: number;
+  /** Player's chemistry fit (0–100). Affects team-wide coordination. */
+  chemistry: number;
 }
 
 /** Per-player game statistics accumulated over the full game. */
@@ -172,6 +205,8 @@ export interface SimulationState {
   playerStats: Record<string, PlayerGameStats>;
   /** True while a shot is in the air. */
   shotInFlight: boolean;
+  /** Team-wide chemistry ratings for the current game. */
+  teamChemistry: { home: number; away: number };
   /** Current overtime period (0 = regulation, 1 = first OT, 2 = second OT, …). */
   overtimePeriod: number;
   /** Internal: target basket position for an in-flight shot. */
@@ -248,6 +283,8 @@ export interface GameSettings {
    * percentage to simulate home-court crowd energy and familiarity.
    */
   homeCourtBonus: boolean;
+  /** The tactical plan for the home team (if any). */
+  gamePlan?: GamePlan;
   /**
    * Head coach's offensive system rating (0–100).
    * Higher values nudge the home team toward quicker shot decisions and an up-tempo
@@ -279,17 +316,30 @@ export interface Coach {
   recruiting: number; // 0–100
   /** Player development rating — affects in-season player growth. */
   development: number; // 0–100
+  /** Current career level. Higher levels grant skill points. */
+  level: number;
+  /** Current experience points toward the next level. */
+  experience: number;
+  /** Unspent skill points used to upgrade ratings. */
+  skillPoints: number;
+  /** Total wins across all seasons in this career. */
+  careerWins: number;
+  /** Total losses across all seasons in this career. */
+  careerLosses: number;
 }
 
 /** Lightweight opponent descriptor stored within the season schedule. */
 export interface SeasonOpponent {
   id: string;
   name: string;
+  nickname: string;
   abbreviation: string;
   primaryColor: string;
   secondaryColor: string;
   /** Composite quality rating (60–90) used to scale the opponent's generated roster. */
   overall: number;
+  /** Geographic region. */
+  region: "West" | "Midwest" | "East" | "South";
 }
 
 /** One game entry in the season schedule. */
@@ -319,6 +369,17 @@ export interface SeasonGame {
 export interface SeasonRecord {
   wins: number;
   losses: number;
+}
+
+/** A news/event item for the OOTP-style program news feed. */
+export interface NewsItem {
+  id: string;
+  week: number;
+  category: "game" | "ranking" | "recruiting" | "player" | "program" | "milestone";
+  headline: string;
+  detail?: string;
+  /** Positive/neutral/negative valence for color-coding. */
+  tone: "positive" | "neutral" | "negative";
 }
 
 /** Full season state for head-coach mode. */
@@ -354,6 +415,53 @@ export interface Season {
    * Used to label conference games in the schedule.
    */
   conferenceName: string;
+  /** Current program budget in dollars. Used for recruiting and NIL upgrades. */
+  budget: number;
+  /** NIL collective level (0–10). Higher levels improve recruiting and revenue. */
+  nilCollectiveLevel: number;
+  /** Current AP-style rank (1–25, or null if unranked). */
+  rank: number | null;
+  /** Full list of the Top 25 ranked teams. */
+  top25: RankingEntry[];
+  /** The rank of the user's incoming recruiting class (1–100). */
+  recruitingClassRank: number | null;
+  /** Composite rating of the user's incoming recruiting class. */
+  recruitingClassRating: number;
+  /** Active tactical settings for the team. */
+  gamePlan: GamePlan;
+  /** Historical records of past seasons in this career. */
+  history: SeasonHistory[];
+  /** Current postseason status (e.g. "Final Four", "Round of 64", null). */
+  postseasonStatus: string | null;
+  /** OOTP-style news feed for the current season. */
+  news: NewsItem[];
+}
+
+/** Record of a completed season. */
+export interface SeasonHistory {
+  year: number;
+  record: { wins: number; losses: number };
+  prestige: number;
+  recruitingRank: number | null;
+  postseason: string | null;
+}
+
+/** Tactical strategy settings that influence simulation tendencies and pace. */
+export interface GamePlan {
+  pace: "slow" | "balanced" | "fast";
+  focus: "interior" | "balanced" | "perimeter";
+  defensiveIntensity: "conservative" | "neutral" | "aggressive";
+}
+
+/** Entry in the weekly Top 25 rankings. */
+export interface RankingEntry {
+  teamId: string;
+  name: string;
+  nickname: string;
+  abbreviation: string;
+  record: SeasonRecord;
+  overall: number;
+  votes: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -384,10 +492,17 @@ export interface Prospect {
   region: "West" | "Midwest" | "East" | "South";
   /** Likelihood (0–1) that the prospect commits when offered a scholarship. */
   interestLevel: number;
-  /** Whether the prospect has been offered a scholarship. */
+  /** Whether the user has offered a scholarship to this prospect. */
   offered: boolean;
   /** Whether the prospect has committed to the user's program. */
   committed: boolean;
+  /** Hidden potential range (min, max). Revealed or narrowed by scouting. */
+  potentialRange: [number, number];
+  /** Primary playing style. Hidden until scouted or partially revealed. */
+  archetype: PlayerArchetype;
+  /** Unique characteristics. */
+  traits: PlayerTrait[];
+  heightInches: number;
 }
 
 /** Letter grade derived from a prospect's rating (if not yet scouted). */

@@ -156,6 +156,7 @@ export function createInitialSimState(
       ratings,
       fouls: 0,
       stamina: 100,
+      chemistry: homeTeam.chemistry,
     });
   });
 
@@ -174,8 +175,11 @@ export function createInitialSimState(
         hasBall: false,
         speedFactor: speedFactorFromRating(ratings.speed),
         ratings,
+        morale: 100,
+        teamRank: 1,
         fouls: 0,
         stamina: 100,
+        chemistry: homeTeam.chemistry,
       });
     });
 
@@ -196,6 +200,7 @@ export function createInitialSimState(
       ratings,
       fouls: 0,
       stamina: 100,
+      chemistry: awayTeam.chemistry,
     });
   });
 
@@ -216,6 +221,7 @@ export function createInitialSimState(
         ratings,
         fouls: 0,
         stamina: 100,
+        chemistry: awayTeam.chemistry,
       });
     });
 
@@ -263,6 +269,7 @@ export function createInitialSimState(
     _timeSinceLastTargetAssign: 0,
     _isFastBreak: false,
     _hotStreak: {},
+    teamChemistry: { home: homeTeam.chemistry, away: awayTeam.chemistry },
     events: [],
   };
 }
@@ -869,8 +876,15 @@ function tickBallHandler(ctx: TickContext): void {
       ? COACH_OFF_MIN_MULT + (settings.coachOffense / 100) * COACH_OFF_RANGE
       : 1.0;
 
+  // Game Plan Pace: "fast" pushes tempo; "slow" forces patience (OOTP/Football Coach logic).
+  const paceMult = settings.gamePlan?.pace === "fast" ? 1.4 : settings.gamePlan?.pace === "slow" ? 0.7 : 1.0;
+
+  // Game Plan Focus: "perimeter" increases shot chance from deep; "interior" decreases it (prefers pass/drive).
+  const focusMult = (settings.gamePlan?.focus === "perimeter" && distToBasket > 20) ? 1.25 : 
+                    (settings.gamePlan?.focus === "interior" && distToBasket > 20) ? 0.75 : 1.0;
+
   const effectiveShotChance =
-    SHOT_CHANCE_PER_SECOND * shootingBias * distFactor * shotClockPressure * fastBreakMult * coachOffMult * dt;
+    SHOT_CHANCE_PER_SECOND * shootingBias * distFactor * shotClockPressure * fastBreakMult * coachOffMult * paceMult * focusMult * dt;
 
   if (state._timeSinceLastAction > PASS_INTERVAL_MIN && Math.random() < effectiveShotChance) {
     attemptShot(ctx, handler);
@@ -1140,7 +1154,11 @@ function resolveShotInFlight(ctx: TickContext): void {
           (settings.coachDefense != null && defTeam === "home")
             ? (settings.coachDefense / 100) * COACH_DEF_BONUS_MAX
             : 0;
-        const contestStrength = Math.min(CONTEST_STRENGTH_CAP, (nearestDef.player.ratings.defense / 100) * BASE_CONTEST_MULT + coachDefBonus);
+        // Defensive Intensity: aggressive boosts contest at the cost of foul risk
+        const intensityBonus = settings.gamePlan?.defensiveIntensity === "aggressive" ? 0.05 : 
+                               settings.gamePlan?.defensiveIntensity === "conservative" ? -0.05 : 0;
+        
+        const contestStrength = Math.min(CONTEST_STRENGTH_CAP, (nearestDef.player.ratings.defense / 100) * BASE_CONTEST_MULT + coachDefBonus + intensityBonus);
         const proxFactor = Math.max(0, 1 - nearestDef.dist / 10);
         makeProb *= 1 - contestStrength * proxFactor;
       }
@@ -1182,10 +1200,16 @@ function resolveShotInFlight(ctx: TickContext): void {
       }
     }
 
-    // Home-court advantage: small boost to the home team's field-goal percentage.
+    // Home-court advantage: boost based on crowd and chemistry synergy
     if (ctx.settings.homeCourtBonus && state.possession.team === "home") {
-      makeProb = Math.min(MAX_LAYUP_PROBABILITY, makeProb + HOME_COURT_SHOT_BONUS);
+      const hfa = HOME_COURT_SHOT_BONUS + (state.teamChemistry.home / 100) * 0.01;
+      makeProb = Math.min(MAX_LAYUP_PROBABILITY, makeProb + hfa);
     }
+
+    // Chemistry boost: high team chemistry reduces the chance of "bad" rolls
+    const teamChem = state.possession.team === "home" ? state.teamChemistry.home : state.teamChemistry.away;
+    const chemistryBoost = (teamChem / 100) * 0.015;
+    makeProb = Math.min(MAX_LAYUP_PROBABILITY, makeProb + chemistryBoost);
 
     // Track field-goal attempt in stats
     if (shooter && state.playerStats[shooter.id]) {
@@ -1211,9 +1235,13 @@ function resolveShotInFlight(ctx: TickContext): void {
     if (shooter && nearestDef && nearestDef.dist < SHOOTING_FOUL_RANGE_FT && nearestDef.player.fouls < 5) {
       const proximity = 1 - nearestDef.dist / SHOOTING_FOUL_RANGE_FT;
       // Fouls are more likely on contested close shots than on pull-up jumpers.
+      // Defensive Intensity: aggressive increases foul rate significantly.
+      const intensityFoulMult = settings.gamePlan?.defensiveIntensity === "aggressive" ? 1.5 : 
+                                settings.gamePlan?.defensiveIntensity === "conservative" ? 0.6 : 1.0;
+
       // And-1 fouls (made + foul) are intentionally rare.
       const baseFoulChance = made ? AND_ONE_FOUL_BASE_CHANCE : MISSED_SHOT_FOUL_BASE_CHANCE;
-      const foulChance = baseFoulChance * (nearestDef.player.ratings.defense / 100) * proximity;
+      const foulChance = baseFoulChance * (nearestDef.player.ratings.defense / 100) * proximity * intensityFoulMult;
       if (Math.random() < foulChance) {
         isFouled = true;
         fouler = nearestDef.player;
@@ -1503,10 +1531,11 @@ function executePass(ctx: TickContext, from: SimPlayer, to: SimPlayer): void {
       return sum + Math.max(0, 1 - laneDist / 10) * (d.ratings.defense / 100);
     }, 0);
     const passSkill = from.ratings.passing / 100;
-    const badPassChance = Math.min(
+    const chemistryMitigation = (from.chemistry / 100) * 0.04;
+    const badPassChance = Math.max(0, Math.min(
       BAD_PASS_MAX_CHANCE,
-      pressure * 0.045 * (1 - passSkill * 0.55)
-    );
+      (pressure * 0.045 * (1 - passSkill * 0.55)) - chemistryMitigation
+    ));
     if (Math.random() < badPassChance) {
       from.hasBall = false;
       recordTurnoverForTeam(state, from.teamId, from.id);

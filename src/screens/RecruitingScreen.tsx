@@ -162,6 +162,8 @@ export default function RecruitingScreen() {
             <select
               value={regionFilter}
               onChange={(e) => setRegionFilter(e.target.value as RegionFilter)}
+              title="Filter by Region"
+              aria-label="Filter prospects by region"
               className="rounded-full border border-white/12 bg-white/5 px-3 py-1 text-[11px] text-white/70 focus:outline-none"
             >
               {REGION_ORDER.map((r) => (
@@ -173,6 +175,8 @@ export default function RecruitingScreen() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              title="Sort Prospects"
+              aria-label="Sort prospects list"
               className="rounded-full border border-white/12 bg-white/5 px-3 py-1 text-[11px] text-white/70 focus:outline-none"
             >
               <option value="rating" className="bg-[#0d1f2d]">Sort: Rating</option>
@@ -199,6 +203,7 @@ export default function RecruitingScreen() {
                   canScout={scoutingPoints > 0 && !p.scouted}
                   onScout={() => scoutProspect(p.id)}
                   onOffer={() => offerProspect(p.id)}
+                  userRegion={season.team.region}
                 />
               ))
             )}
@@ -247,9 +252,17 @@ interface ProspectRowProps {
   canScout: boolean;
   onScout: () => void;
   onOffer: () => void;
+  userRegion?: string;
+  key?: any;
 }
 
-function ProspectRow({ prospect: p, canScout, onScout, onOffer }: ProspectRowProps) {
+function ProspectRow({ 
+  prospect: p, 
+  canScout, 
+  onScout, 
+  onOffer,
+  userRegion
+}: ProspectRowProps) {
   const ratingDisplay = p.scouted ? String(p.rating) : prospectGrade(p.rating);
   const interestPct   = Math.round(p.interestLevel * 100);
 
@@ -283,8 +296,23 @@ function ProspectRow({ prospect: p, canScout, onScout, onOffer }: ProspectRowPro
 
       {/* Name + region */}
       <div className="flex-1">
-        <div className="text-sm font-bold text-white">
-          {p.firstName} {p.lastName}
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col">
+            <div className="text-sm font-bold text-white">
+              {p.firstName} {p.lastName}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-medium uppercase tracking-widest text-white/30">{p.archetype}</span>
+              {p.scouted && p.traits.map(t => (
+                <span key={t} className="rounded-sm bg-amber-400/10 px-1 text-[8px] font-bold uppercase tracking-wider text-amber-400/60 ring-1 ring-inset ring-amber-400/20">{t}</span>
+              ))}
+            </div>
+          </div>
+          {userRegion === p.region && (
+            <span className="rounded border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400/80">
+              Regional Bonus
+            </span>
+          )}
         </div>
         <div className="mt-0.5 text-[11px] text-white/40">{p.region} Region</div>
       </div>
@@ -309,6 +337,16 @@ function ProspectRow({ prospect: p, canScout, onScout, onOffer }: ProspectRowPro
         </div>
         <div className={`mt-0.5 text-xl font-black ${interestColor}`}>
           {interestPct}%
+        </div>
+      </div>
+
+      {/* Potential Range (OOTP style) */}
+      <div className="flex shrink-0 flex-col items-center px-2">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/35">
+          Potential
+        </div>
+        <div className={`mt-0.5 text-lg font-black ${p.scouted ? "text-amber-300" : "text-white/35"}`}>
+          {p.potentialRange[0]}–{p.potentialRange[1]}
         </div>
       </div>
 

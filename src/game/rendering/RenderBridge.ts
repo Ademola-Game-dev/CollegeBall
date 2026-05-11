@@ -111,8 +111,15 @@ export class RenderBridge {
       const isHome     = sp.teamId === "home";
       const playerData = allPlayers.find((p) => p.id === sp.id);
       const number     = playerData?.number ?? 0;
+      const heightInches = playerData?.heightInches ?? 78;
 
-      const visual = createPlayerVisual(this.scene, { id: sp.id, team, isHome, number });
+      const visual = createPlayerVisual(this.scene, { 
+        id: sp.id, 
+        team, 
+        isHome, 
+        number, 
+        heightInches 
+      });
 
       this.playerVisuals.set(sp.id, visual);
       this.animStates.set(sp.id, makeIdleAnimState());

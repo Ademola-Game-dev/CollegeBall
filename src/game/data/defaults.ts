@@ -21,8 +21,14 @@ import { randomFirstName, randomLastName } from "./names";
 // Helpers
 // ---------------------------------------------------------------------------
 
-let _nextId = 1;
+let _nextId = 100;
 const uid = (): string => `player_${_nextId++}`;
+
+const NICKNAMES = [
+  "Wildcats", "Tigers", "Bulldogs", "Spartans", "Bruins", "Wolverines", "Huskies", "Jayhawks", 
+  "Tar Heels", "Blue Devils", "Longhorns", "Aggies", "Buckeyes", "Badgers", "Gators", 
+  "Cardinals", "Utes", "Ducks", "Beavers", "Golden Bears"
+];
 
 /** Return a random integer in [min, max]. */
 function rand(min: number, max: number): number {
@@ -40,6 +46,17 @@ const RATING_RANGES: Record<PlayerPosition, Record<keyof import("../types").Play
   PF: { speed: [44, 74], shooting: [44, 76], passing: [36, 66], defense: [60, 88], rebounding: [65, 90], endurance: [48, 78] },
   C:  { speed: [35, 65], shooting: [38, 72], passing: [32, 62], defense: [62, 90], rebounding: [70, 92], endurance: [45, 75] },
 };
+
+function randomHeight(pos: PlayerPosition): number {
+  const ranges: Record<PlayerPosition, [number, number]> = {
+    PG: [70, 76], // 5'10" - 6'4"
+    SG: [74, 79], // 6'2" - 6'7"
+    SF: [77, 82], // 6'5" - 6'10"
+    PF: [80, 84], // 6'8" - 7'0"
+    C:  [82, 87], // 6'10" - 7'3"
+  };
+  return rand(...ranges[pos]);
+}
 
 function makeRatings(pos: PlayerPosition): import("../types").PlayerRatings {
   const r = RATING_RANGES[pos];
@@ -83,8 +100,6 @@ function makeScaledRatings(pos: PlayerPosition, overall: number): import("../typ
  * Adapted from CFHC's year-distribution logic.
  */
 function assignYear(slotIndex: number): 1 | 2 | 3 | 4 {
-  // Slots 0-4: starters — weighted toward 2–4 (So/Jr/Sr)
-  // Slots 5+: bench — weighted toward 1–3 (Fr/So/Jr)
   if (slotIndex < 5) {
     const roll = Math.random();
     if (roll < 0.20) return 2;
@@ -110,7 +125,33 @@ function makePlayers(
     position: pos,
     ratings: makeRatings(pos),
     year: assignYear(idx),
+    morale: 80 + rand(-5, 10), // start with healthy morale
+    potential: 50 + rand(0, 45), // random potential 50-95
+    archetype: pickArchetype(pos),
+    traits: pickTraits(pos),
+    heightInches: randomHeight(pos),
   }));
+}
+
+function pickArchetype(pos: import("../types").PlayerPosition): import("../types").PlayerArchetype {
+  const archetypes: Record<import("../types").PlayerPosition, import("../types").PlayerArchetype[]> = {
+    PG: ["Pass-First PG", "Scoring Guard"],
+    SG: ["Scoring Guard", "Wing Sniper"],
+    SF: ["Wing Sniper", "Two-Way Wing"],
+    PF: ["Stretch Big", "Post Anchor"],
+    C:  ["Glass Cleaner", "Post Anchor"],
+  };
+  const list = archetypes[pos];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function pickTraits(pos: import("../types").PlayerPosition): import("../types").PlayerTrait[] {
+  const pool: import("../types").PlayerTrait[] = ["Clutch", "Floor General", "Brick Wall", "Microwave", "Enforcer", "High Motor"];
+  const traits: import("../types").PlayerTrait[] = [];
+  if (Math.random() > 0.6) {
+    traits.push(pool[Math.floor(Math.random() * pool.length)]);
+  }
+  return traits;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,40 +184,37 @@ export const defaultHomeTeam: Team = {
   id: "home",
   name: "State Bulldogs",
   abbreviation: "STB",
-  primaryColor: "#1e40af", // blue
+  primaryColor: "#1e40af",
   secondaryColor: "#ffffff",
   roster: homePlayers,
   lineup: homePlayers.slice(0, 5).map((p) => p.id) as Lineup,
+  chemistry: 70,
+  region: "Midwest",
 };
 
 export const defaultAwayTeam: Team = {
   id: "away",
-  name: "Central Tigers",
-  abbreviation: "CTG",
-  primaryColor: "#b91c1c", // red
+  name: "Central",
+  nickname: "Blue Devils", // Default user team nickname
+  abbreviation: "PAC",
+  primaryColor: "#b91c1c",
   secondaryColor: "#fbbf24",
   roster: awayPlayers,
   lineup: awayPlayers.slice(0, 5).map((p) => p.id) as Lineup,
+  chemistry: 65,
+  region: "South",
 };
-
-// ---------------------------------------------------------------------------
-// Default settings
-// ---------------------------------------------------------------------------
 
 export const defaultGameSettings: GameSettings = {
-  halfLength: 20 * 60, // 20 minutes per half
-  shotClockLength: 30, // NCAA men's shot clock
-  bonusFoulThreshold: 7, // one-and-one starts at 7 team fouls
-  doubleBonusThreshold: 10, // double bonus at 10 team fouls
-  subStaminaThreshold: 25, // sub out players below 25% stamina
-  homeCourtBonus: true, // home team receives a small shooting/FT advantage
-  coachOffense: 50, // neutral coach offensive system rating
-  coachDefense: 50, // neutral coach defensive system rating
+  halfLength: 20 * 60,
+  shotClockLength: 30,
+  bonusFoulThreshold: 7,
+  doubleBonusThreshold: 10,
+  subStaminaThreshold: 25,
+  homeCourtBonus: true,
+  coachOffense: 50,
+  coachDefense: 50,
 };
-
-// ---------------------------------------------------------------------------
-// Head Coach & Season Mode data
-// ---------------------------------------------------------------------------
 
 export const defaultCoach: Coach = {
   id: "coach_default",
@@ -186,51 +224,44 @@ export const defaultCoach: Coach = {
   defense: 68,
   recruiting: 65,
   development: 70,
+  level: 1,
+  experience: 0,
+  skillPoints: 0,
+  careerWins: 0,
+  careerLosses: 0,
 };
 
-/** Ten opponents that make up a default season schedule. */
 const SEASON_OPPONENTS: SeasonOpponent[] = [
-  { id: "opp_1",  name: "Riverside Hawks",   abbreviation: "RVH", primaryColor: "#7c3aed", secondaryColor: "#ffffff", overall: 68 },
-  { id: "opp_2",  name: "Eastwood Eagles",   abbreviation: "EWE", primaryColor: "#0369a1", secondaryColor: "#fbbf24", overall: 72 },
-  { id: "opp_3",  name: "Summit Wolves",     abbreviation: "SMW", primaryColor: "#047857", secondaryColor: "#ffffff", overall: 76 },
-  { id: "opp_4",  name: "Lakeview Lions",    abbreviation: "LVL", primaryColor: "#b45309", secondaryColor: "#ffffff", overall: 71 },
-  { id: "opp_5",  name: "Northgate Rams",    abbreviation: "NGR", primaryColor: "#be123c", secondaryColor: "#f1f5f9", overall: 80 },
-  { id: "opp_6",  name: "Crestwood Cougars", abbreviation: "CWC", primaryColor: "#0f766e", secondaryColor: "#ffffff", overall: 74 },
-  { id: "opp_7",  name: "Valley Falcons",    abbreviation: "VLF", primaryColor: "#6d28d9", secondaryColor: "#fbbf24", overall: 78 },
-  { id: "opp_8",  name: "Hillside Spartans", abbreviation: "HLS", primaryColor: "#1e3a8a", secondaryColor: "#e2e8f0", overall: 69 },
-  { id: "opp_9",  name: "Westbrook Bears",   abbreviation: "WBB", primaryColor: "#92400e", secondaryColor: "#ffffff", overall: 83 },
-  { id: "opp_10", name: "Pinewood Panthers", abbreviation: "PWP", primaryColor: "#1f2937", secondaryColor: "#10b981", overall: 65 },
+  { id: "opp_1",  name: "Riverside",   nickname: "Hawks",     abbreviation: "RVH", primaryColor: "#7c3aed", secondaryColor: "#ffffff", overall: 68, region: "West" },
+  { id: "opp_2",  name: "Eastern",     nickname: "Eagles",    abbreviation: "EWE", primaryColor: "#0369a1", secondaryColor: "#fbbf24", overall: 72, region: "East" },
+  { id: "opp_3",  name: "Summit",      nickname: "Wolves",    abbreviation: "SMW", primaryColor: "#047857", secondaryColor: "#ffffff", overall: 76, region: "West" },
+  { id: "opp_4",  name: "Lakewood",    nickname: "Lions",     abbreviation: "LWL", primaryColor: "#b45309", secondaryColor: "#ffffff", overall: 71, region: "Midwest" },
+  { id: "opp_5",  name: "Northern",    nickname: "Rams",      abbreviation: "NGR", primaryColor: "#be123c", secondaryColor: "#f1f5f9", overall: 80, region: "South" },
+  { id: "opp_6",  name: "Coastal",     nickname: "Cougars",   abbreviation: "CWC", primaryColor: "#0f766e", secondaryColor: "#ffffff", overall: 74, region: "Midwest" },
+  { id: "opp_7",  name: "Midland",     nickname: "Falcons",   abbreviation: "MDF", primaryColor: "#6d28d9", secondaryColor: "#fbbf24", overall: 78, region: "South" },
+  { id: "opp_8",  name: "Hillside",    nickname: "Spartans",  abbreviation: "HLS", primaryColor: "#1e3a8a", secondaryColor: "#e2e8f0", overall: 69, region: "East" },
+  { id: "opp_9",  name: "Western",     nickname: "Bears",     abbreviation: "WBB", primaryColor: "#92400e", secondaryColor: "#ffffff", overall: 83, region: "West" },
+  { id: "opp_10", name: "Pinewood",    nickname: "Panthers",  abbreviation: "PWP", primaryColor: "#1f2937", secondaryColor: "#10b981", overall: 65, region: "East" },
 ];
 
-/**
- * Conference opponent pool — the eight teams in the user's conference.
- * Adapted from CFHC's conference scheduling system.
- * These teams appear as "Conference" games in the 13-game schedule.
- */
 const CONF_OPPONENTS: SeasonOpponent[] = [
-  { id: "conf_1", name: "Bridgeport Huskies",  abbreviation: "BPH", primaryColor: "#1e3a8a", secondaryColor: "#f8fafc", overall: 72 },
-  { id: "conf_2", name: "Hartford Colonials",  abbreviation: "HTC", primaryColor: "#7c2d12", secondaryColor: "#fef3c7", overall: 76 },
-  { id: "conf_3", name: "New Haven Knights",   abbreviation: "NHK", primaryColor: "#064e3b", secondaryColor: "#d1fae5", overall: 74 },
-  { id: "conf_4", name: "Providence Friars",   abbreviation: "PRV", primaryColor: "#1c1917", secondaryColor: "#f1f5f9", overall: 79 },
-  { id: "conf_5", name: "Kingston Rams",       abbreviation: "KGR", primaryColor: "#7c3aed", secondaryColor: "#ede9fe", overall: 70 },
-  { id: "conf_6", name: "Albany Monarchs",     abbreviation: "ALB", primaryColor: "#065f46", secondaryColor: "#d1fae5", overall: 77 },
-  { id: "conf_7", name: "Lowell Chargers",     abbreviation: "LWC", primaryColor: "#c2410c", secondaryColor: "#fef3c7", overall: 73 },
-  { id: "conf_8", name: "Burlington Bears",    abbreviation: "BLB", primaryColor: "#0369a1", secondaryColor: "#f0f9ff", overall: 68 },
+  { id: "conf_1", name: "Bay State",   nickname: "Huskies",   abbreviation: "BSH", primaryColor: "#1e3a8a", secondaryColor: "#f8fafc", overall: 72, region: "East" },
+  { id: "conf_2", name: "Hartwick",    nickname: "Colonials", abbreviation: "HTC", primaryColor: "#7c2d12", secondaryColor: "#fef3c7", overall: 76, region: "East" },
+  { id: "conf_3", name: "Northfield",  nickname: "Knights",   abbreviation: "NHK", primaryColor: "#064e3b", secondaryColor: "#d1fae5", overall: 74, region: "East" },
+  { id: "conf_4", name: "Providence",  nickname: "Friars",    abbreviation: "PRV", primaryColor: "#1c1917", secondaryColor: "#f1f5f9", overall: 79, region: "East" },
+  { id: "conf_5", name: "Kingston",    nickname: "Rams",      abbreviation: "KGR", primaryColor: "#7c3aed", secondaryColor: "#ede9fe", overall: 70, region: "East" },
+  { id: "conf_6", name: "Albright",    nickname: "Monarchs",  abbreviation: "ALB", primaryColor: "#065f46", secondaryColor: "#d1fae5", overall: 77, region: "East" },
+  { id: "conf_7", name: "Lakewell",    nickname: "Chargers",  abbreviation: "LWC", primaryColor: "#c2410c", secondaryColor: "#fef3c7", overall: 73, region: "East" },
+  { id: "conf_8", name: "Bluemont",    nickname: "Bears",     abbreviation: "BLB", primaryColor: "#0369a1", secondaryColor: "#f0f9ff", overall: 68, region: "East" },
 ];
 
-/**
- * Generate a full Team for a season opponent.
- * Now uses the CFHC-derived name database for realistic player names.
- */
 export function makeOpponentTeam(opponent: SeasonOpponent): Team {
   const slots: [PlayerPosition, number][] = [
     ["PG", 1], ["SG", 2], ["SF", 3], ["PF", 4], ["C", 5],
     ["PG", 11], ["SG", 12], ["SF", 13],
   ];
-
   const usedFirst = new Set<string>();
   const usedLast  = new Set<string>();
-
   const pickUniqueName = (used: Set<string>, picker: () => string): string => {
     let name = picker();
     let attempts = 0;
@@ -250,20 +281,24 @@ export function makeOpponentTeam(opponent: SeasonOpponent): Team {
     position:  pos,
     ratings:   makeScaledRatings(pos, opponent.overall),
     year:      assignYear(idx),
+    morale:    80 + rand(-5, 10),
+    potential: 50 + rand(0, 40),
   }));
 
   return {
-    id:             opponent.id,
-    name:           opponent.name,
-    abbreviation:   opponent.abbreviation,
-    primaryColor:   opponent.primaryColor,
+    id: opponent.id,
+    name: opponent.name,
+    nickname: opponent.nickname ?? opponent.name,
+    abbreviation: opponent.abbreviation,
+    primaryColor: opponent.primaryColor,
     secondaryColor: opponent.secondaryColor,
-    roster:         players,
-    lineup:         players.slice(0, 5).map((p) => p.id) as Lineup,
+    roster: players,
+    lineup: players.slice(0, 5).map((p) => p.id) as Lineup,
+    chemistry: rand(45, 82),
+    region: opponent.region,
   };
 }
 
-/** Compute a single composite overall rating for a team (0–100). */
 export function computeTeamOverall(team: Team): number {
   const n = team.roster.length || 1;
   const sum = team.roster.reduce((acc, p) => {
@@ -273,123 +308,105 @@ export function computeTeamOverall(team: Team): number {
   return Math.round(sum / n);
 }
 
-/**
- * Build a fresh 13-game season schedule modelled after CFHC's schedule system:
- *   - 4 non-conference games (weeks 1–4, against the "OOC" pool)
- *   - 8 conference games (weeks 5–12, against conf opponents with alternating home/away)
- *   - 1 conference title game (week 13, neutral site vs the best conf opponent)
- *
- * This mirrors CFHC's Conference / OOC / Conference-Championship model.
- */
 export function createDefaultSeason(): Season {
   const schedule: SeasonGame[] = [];
   let week = 1;
 
-  // Non-conference games (weeks 1–4)
-  const nonConfOpponents = SEASON_OPPONENTS.slice(0, 4);
-  nonConfOpponents.forEach((opp, i) => {
+  SEASON_OPPONENTS.slice(0, 4).forEach((opp, i) => {
     schedule.push({
-      id:           `game_nc_${i + 1}`,
-      week:         week++,
-      isHome:       i % 2 === 0,
-      opponent:     opp,
-      result:       null,
-      userScore:    null,
+      id: `game_nc_${i + 1}`,
+      week: week++,
+      isHome: i % 2 === 0,
+      opponent: opp,
+      result: null,
+      userScore: null,
       opponentScore: null,
-      gameType:     "non-conf",
+      gameType: "non-conf",
     });
   });
 
-  // Conference games (weeks 5–12)
   CONF_OPPONENTS.forEach((opp, i) => {
     schedule.push({
-      id:           `game_conf_${i + 1}`,
-      week:         week++,
-      isHome:       i % 2 === 0,
-      opponent:     opp,
-      result:       null,
-      userScore:    null,
+      id: `game_conf_${i + 1}`,
+      week: week++,
+      isHome: i % 2 === 0,
+      opponent: opp,
+      result: null,
+      userScore: null,
       opponentScore: null,
-      gameType:     "conf",
+      gameType: "conf",
     });
   });
 
-  // Conference title game (week 13) — vs the strongest conference opponent
   const titleOpponent = [...CONF_OPPONENTS].sort((a, b) => b.overall - a.overall)[0];
   schedule.push({
-    id:           "game_conf_title",
-    week:         week,
-    isHome:       false, // neutral site
-    opponent:     titleOpponent,
-    result:       null,
-    userScore:    null,
+    id: "game_conf_title",
+    week: week,
+    isHome: false,
+    opponent: titleOpponent,
+    result: null,
+    userScore: null,
     opponentScore: null,
-    gameType:     "conf-title",
+    gameType: "conf-title",
   });
 
   return {
-    year:              2025,
-    coach:             defaultCoach,
-    team:              { ...defaultHomeTeam, roster: [...defaultHomeTeam.roster] },
+    year: 2025,
+    coach: defaultCoach,
+    team: { ...defaultHomeTeam, name: "Pacific", nickname: "Blue Devils" },
     schedule,
-    record:            { wins: 0, losses: 0 },
-    conferenceRecord:  { wins: 0, losses: 0 },
-    prestige:          60,
-    conferenceName:    "Big East",
-    currentGameIndex:  0,
-    seasonStats:       {},
+    record: { wins: 0, losses: 0 },
+    conferenceRecord: { wins: 0, losses: 0 },
+    prestige: 60,
+    conferenceName: "Big East",
+    currentGameIndex: 0,
+    seasonStats: {},
     gamesPlayedWithStats: 0,
+    budget: 1250,
+    nilCollectiveLevel: 0,
+    rank: null,
+    top25: generateTop25(defaultHomeTeam, [...SEASON_OPPONENTS, ...CONF_OPPONENTS]),
+    gamePlan: {
+      pace: "balanced",
+      focus: "balanced",
+      defensiveIntensity: "neutral",
+    },
+    history: [],
+    postseasonStatus: null,
+    news: [{
+      id: "news_start",
+      week: 0,
+      category: "program",
+      headline: `${defaultCoach.firstName} ${defaultCoach.lastName} begins ${new Date().getFullYear()} campaign`,
+      detail: "Season tips off. The journey to a conference title begins today.",
+      tone: "neutral",
+    }],
   };
 }
 
-// ---------------------------------------------------------------------------
-// Recruiting: off-season prospect generation
-// ---------------------------------------------------------------------------
-
 const REGIONS = ["West", "Midwest", "East", "South"] as const;
 const POSITIONS: PlayerPosition[] = ["PG", "SG", "SF", "PF", "C"];
-
-// Prospect rating thresholds
 const ELITE_PROSPECT_MIN_RATING = 84;
 const ELITE_PROSPECT_MAX_RATING = 96;
 const STANDARD_PROSPECT_MIN_RATING = 52;
 const STANDARD_PROSPECT_MAX_RATING = 83;
-
-// Recruiting class sizing
 const MIN_RECRUITING_CLASS_SIZE = 3;
 const RECRUITING_POOL_BUFFER = 12;
 const MIN_SCOUTING_POINTS = 3;
 const RECRUITING_TO_SCOUTING_DIVISOR = 15;
 
-/**
- * Generate a pool of incoming-class prospects for the off-season recruiting phase.
- *
- * Concept directly ported from CFHC's RecruitingSessionData:
- *  - Prospects are spread across positions and regions
- *  - Ratings are normally distributed with higher-prestige programs seeing more
- *    elite prospects in their pool
- *  - Scouted = false by default; costs a scouting point to reveal true rating
- *  - interestLevel is affected by the program's prestige vs prospect quality
- *
- * @param prestige  Program prestige (0–100) from the Season state
- * @param recruiting  Coach recruiting rating (0–100) from the Coach profile
- * @param count     Number of prospects to generate (default 30)
- */
 export function generateProspects(
   prestige: number,
   recruiting: number,
+  teamRegion: string,
   count = 30
 ): Prospect[] {
   const prospects: Prospect[] = [];
   const prestigeFactor = prestige / 100;
   const recruitingFactor = recruiting / 100;
-
-  // Positions in proportion similar to a college basketball roster need:
-  // PG:SG:SF:PF:C ≈ 2:2:2:2:1 per 9 prospects
-  const positionWeights = [2, 2, 2, 2, 1]; // PG SG SF PF C
+  const positionWeights = [2, 2, 2, 2, 1];
 
   for (let i = 0; i < count; i++) {
-    // Pick position weighted by need
     const totalWeight = positionWeights.reduce((a, b) => a + b, 0);
     let roll = Math.random() * totalWeight;
     let posIdx = 0;
@@ -398,9 +415,6 @@ export function generateProspects(
       if (roll <= 0) { posIdx = j; break; }
     }
     const position = POSITIONS[posIdx];
-
-    // Rating: elite prospects (ELITE range) are rare; most fall in the STANDARD range.
-    // Recruiting rating and prestige increase the chance of top prospects appearing.
     const eliteChance = 0.05 + prestigeFactor * 0.15 + recruitingFactor * 0.10;
     let rating: number;
     if (Math.random() < eliteChance) {
@@ -408,13 +422,14 @@ export function generateProspects(
     } else {
       rating = rand(STANDARD_PROSPECT_MIN_RATING, STANDARD_PROSPECT_MAX_RATING);
     }
-
     const region = REGIONS[Math.floor(Math.random() * REGIONS.length)];
-
-    // Interest level: higher prestige = more interest, attenuated by rating mismatch
+    const regionBias = region === teamRegion ? 0.12 : 0;
     const baseInterest = 0.35 + prestigeFactor * 0.40;
     const ratingPenalty = Math.max(0, (rating - 75) / 100) * 0.25;
-    const interestLevel = Math.max(0.10, Math.min(0.95, baseInterest - ratingPenalty + (Math.random() - 0.5) * 0.20));
+    const interestLevel = Math.max(0.10, Math.min(0.95, baseInterest - ratingPenalty + regionBias + (Math.random() - 0.5) * 0.20));
+
+    const pot = rating + rand(-5, 20);
+    const potentialRange: [number, number] = [Math.max(0, pot - 15), Math.min(100, pot + 15)];
 
     prospects.push({
       id: uid(),
@@ -427,56 +442,60 @@ export function generateProspects(
       interestLevel,
       offered: false,
       committed: false,
+      potentialRange,
+      archetype: pickArchetype(position),
+      traits: pickTraits(position),
+      heightInches: randomHeight(position),
     });
   }
-
-  // Sort: unsorted by default to simulate a "big board" feel — user must discover order
   return prospects;
 }
 
-/**
- * Advance a player's year and apply development gains.
- *
- * Based on CFHC's end-of-season `advanceSeason` logic where players progress
- * through Fr → So → Jr → Sr and receive rating improvements driven by
- * potential and coach development rating.
- *
- * @returns The updated player, or null if the player has graduated (was a Senior).
- */
-export function developAndAdvancePlayer(
-  player: Player,
-  coachDevelopment: number
-): Player | null {
-  if (player.year === 4) return null; // senior graduates
+export function makeOpponents(count: number): SeasonOpponent[] {
+  const opps: SeasonOpponent[] = [];
+  const names = ["State", "Central", "Western", "North", "Coast", "Tech", "Valley", "Lakes", "Southern", "East"];
+  for (let i = 0; i < count; i++) {
+    const name = names[i % names.length] + (Math.random() > 0.5 ? " Univ" : "");
+    const nickname = NICKNAMES[rand(0, NICKNAMES.length - 1)];
+    opps.push({
+      id: `opp_${i}`,
+      name,
+      nickname,
+      abbreviation: (name.substring(0, 1) + nickname.substring(0, 2)).toUpperCase(),
+      primaryColor: `hsl(${rand(0, 360)}, 70%, 50%)`,
+      secondaryColor: "#ffffff",
+      overall: rand(65, 88),
+      region: REGIONS[rand(0, 3)],
+    });
+  }
+  return opps;
+}
 
+export function developAndAdvancePlayer(player: Player, coachDevelopment: number): Player | null {
+  if (player.year === 4) return null;
   const devFactor = coachDevelopment / 100;
+  const potFactor = player.potential / 100;
 
-  // Improvement is larger for younger players (higher ceiling) and
-  // tapered by the development rating — mirrors CFHC's progression model.
-  const yearFactor = (4 - player.year) / 3; // 1.0 for Fr→So, 0.33 for Jr→Sr
-  const improvementBase = Math.round(yearFactor * devFactor * 6);
+  // Improvement is larger for younger players and capped by potential.
+  const yearFactor = (4 - player.year) / 3; 
+  const improvementBase = Math.round(yearFactor * devFactor * potFactor * 9);
 
-  const improve = (val: number): number =>
-    Math.min(99, val + improvementBase + Math.round((Math.random() - 0.3) * 3));
-
+  const improve = (val: number): number => Math.min(99, val + improvementBase + Math.round((Math.random() - 0.2) * 3));
   return {
     ...player,
     year: (player.year + 1) as 2 | 3 | 4,
     ratings: {
-      speed:      improve(player.ratings.speed),
-      shooting:   improve(player.ratings.shooting),
-      passing:    improve(player.ratings.passing),
-      defense:    improve(player.ratings.defense),
+      speed: improve(player.ratings.speed),
+      shooting: improve(player.ratings.shooting),
+      passing: improve(player.ratings.passing),
+      defense: improve(player.ratings.defense),
       rebounding: improve(player.ratings.rebounding),
-      endurance:  improve(player.ratings.endurance),
+      endurance: improve(player.ratings.endurance),
     },
+    morale: Math.min(100, player.morale + rand(-5, 10)),
   };
 }
 
-/**
- * Convert a committed Prospect into a Player ready to join the roster.
- * The new player is a Freshman (year = 1).
- */
 export function prospectToPlayer(prospect: Prospect, number: number): Player {
   return {
     id: uid(),
@@ -485,6 +504,38 @@ export function prospectToPlayer(prospect: Prospect, number: number): Player {
     number,
     position: prospect.position,
     year: 1,
-    ratings: makeScaledRatings(prospect.position, prospect.rating),
+    ratings: {
+      speed: prospect.rating,
+      shooting: prospect.rating,
+      passing: prospect.rating,
+      defense: prospect.rating,
+      rebounding: prospect.rating,
+      endurance: prospect.rating,
+    },
+    morale: 85 + rand(-2, 5),
+    potential: prospect.rating + rand(-5, 15),
+    archetype: prospect.archetype,
+    traits: prospect.traits,
   };
+}
+
+export function generateTop25(userTeam: Team, opponents: SeasonOpponent[]): import("../types").RankingEntry[] {
+  const allTeams = [userTeam, ...opponents];
+  return allTeams
+    .map((t) => {
+      const overall = (t as any).overall ?? computeTeamOverall(t as Team);
+      const winPct = t.id === userTeam.id ? 0 : 0.5 + (Math.random() - 0.5) * 0.2;
+      const votes = Math.round((overall - 60) * 15 + winPct * 300 + (Math.random() - 0.5) * 50);
+      return {
+        teamId: t.id,
+        name: t.name,
+        nickname: (t as any).nickname,
+        abbreviation: t.abbreviation,
+        overall,
+        record: { wins: 0, losses: 0 },
+        votes,
+      };
+    })
+    .sort((a, b) => b.votes - a.votes)
+    .slice(0, 25);
 }
