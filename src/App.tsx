@@ -8,6 +8,7 @@ import MainMenu from "./screens/MainMenu";
 import GameScreen from "./screens/GameScreen";
 import SeasonHub from "./screens/SeasonHub";
 import RecruitingScreen from "./screens/RecruitingScreen";
+import NewGameSetup from "./screens/NewGameSetup";
 
 export default function App() {
   const screen = useGameStore((s) => s.screen);
@@ -15,6 +16,8 @@ export default function App() {
   switch (screen) {
     case "menu":
       return <MainMenu />;
+    case "new-game":
+      return <NewGameSetup />;
     case "game":
       return <GameScreen />;
     case "season":

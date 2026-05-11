@@ -108,8 +108,8 @@ export default function SeasonHub() {
                   rank={season.rank}
                 />
                 <div className="flex flex-col gap-5">
-                  <StrategyCard gamePlan={season.gamePlan} onUpdate={updateGamePlan} />
                   <EconomyCard season={season} onUpgradeNIL={upgradeNILCollective} />
+                  <RecruitingCard season={season} onRecruit={() => setScreen("recruiting")} />
                 </div>
               </div>
 
@@ -451,12 +451,12 @@ function EconomyCard({ season, onUpgradeNIL }: { season: Season; onUpgradeNIL: (
         <div className="mt-4 flex flex-col gap-3">
           <div className="flex items-center justify-between rounded-[20px] border border-white/8 bg-black/20 p-4">
             <div>
-              <div className="text-[9px] font-bold uppercase tracking-[0.25em] text-emerald-400/70">NIL Collective</div>
-              <div className="mt-1 text-xl font-black text-white">Lvl {season.nilCollectiveLevel}</div>
+              <div className="text-[9px] font-bold uppercase tracking-[0.25em] text-emerald-400/70">NIL Budget</div>
+              <div className="mt-1 text-xl font-black text-white">${(season.nilBudget / 1000).toFixed(1)}k</div>
             </div>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
@@ -471,10 +471,34 @@ function EconomyCard({ season, onUpgradeNIL }: { season: Season; onUpgradeNIL: (
             }`}
           >
             <span className="relative z-10">
-              {season.nilCollectiveLevel >= 10 ? "Max NIL Level" : `Upgrade NIL ($${nilUpgradeCost.toLocaleString()})`}
+              {season.nilCollectiveLevel >= 10 ? "Max NIL Level" : `Raise Funds ($${nilUpgradeCost.toLocaleString()})`}
             </span>
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RecruitingCard({ season, onRecruit }: { season: Season; onRecruit: () => void }) {
+  return (
+    <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[linear-gradient(135deg,rgba(6,14,23,0.97),rgba(5,10,18,0.85))] px-6 py-7 sm:px-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.14),transparent_40%)]" />
+      <div className="relative">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.4em] text-cyan-300/65">
+          Recruiting Pipeline
+        </div>
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="text-4xl font-black text-white">{season.recruitingPoints}</span>
+          <span className="text-sm text-white/45">Weekly Pts</span>
+        </div>
+
+        <button
+          onClick={onRecruit}
+          className="mt-6 w-full rounded-2xl bg-cyan-400 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 transition-all hover:bg-cyan-300 active:scale-95"
+        >
+          Open Recruiting
+        </button>
       </div>
     </div>
   );

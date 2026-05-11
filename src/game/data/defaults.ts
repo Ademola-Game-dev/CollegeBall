@@ -310,6 +310,82 @@ export function makeOpponentTeam(opponent: SeasonOpponent): Team {
   };
 }
 
+export function createInitialSeason(
+  userTeam: Team,
+  coach: Coach,
+  settings: GameSettings
+): Season {
+  // Generate a conference of 10 teams (including user)
+  const conference = [
+    userTeam,
+    ...AVAILABLE_TEAMS.filter(t => t.id !== userTeam.id).map(t => makeTeam(t.name, t.nickname, t.abbreviation, t.primaryColor, t.secondaryColor, t.region, 70 + Math.random() * 15)),
+    ...Array.from({ length: 10 - AVAILABLE_TEAMS.length }).map((_, i) => makeTeam(`Opponent ${i}`, "Bears", "OPP", "#555", "#aaa", "Midwest", 65 + Math.random() * 10))
+  ].slice(0, 10);
+  return {
+    year: 2025,
+    coach,
+    team: userTeam,
+    schedule: [],
+    record: { wins: 0, losses: 0 },
+    conferenceRecord: { wins: 0, losses: 0 },
+    prestige: 60,
+    conferenceName: "Big East",
+    currentGameIndex: 0,
+    seasonStats: {},
+    gamesPlayedWithStats: 0,
+    budget: 1250,
+    nilCollectiveLevel: 0,
+    rank: null,
+    top25: [],
+    gamePlan: {
+      pace: "balanced",
+      focus: "balanced",
+      defensiveIntensity: "neutral",
+    },
+    recruitingPoints: 100,
+    nilBudget: 50000,
+    history: [],
+    postseasonStatus: null,
+    news: [],
+  };
+}
+
+export function setupUserTeam(t: Omit<Team, "roster" | "lineup">, overall = 75): Team {
+  return makeTeam(t.name, t.nickname, t.abbreviation, t.primaryColor, t.secondaryColor, t.region, overall);
+}
+
+function makeTeam(name: string, nickname: string, abbrev: string, primary: string, secondary: string, region: string, overall: number): Team {
+  const slots: [PlayerPosition, number][] = [["PG", 1], ["SG", 2], ["SF", 3], ["PF", 4], ["C", 5], ["PG", 11], ["SG", 12], ["SF", 13]];
+  const roster = slots.map(([pos, num], idx) => ({
+    id: uid(),
+    firstName: randomFirstName(),
+    lastName: randomLastName(),
+    number: num,
+    position: pos,
+    ratings: makeScaledRatings(pos, overall),
+    year: assignYear(idx),
+    morale: 80,
+    potential: 50,
+    archetype: pickArchetype(pos),
+    traits: [],
+    heightInches: randomHeight(pos),
+    skinTone: pickSkinTone(),
+    hairColor: pickHairColor(),
+  }));
+  return {
+    id: `opp_${uid()}`,
+    name,
+    nickname,
+    abbreviation: abbrev,
+    primaryColor: primary,
+    secondaryColor: secondary,
+    roster,
+    lineup: roster.slice(0, 5).map(p => p.id) as Lineup,
+    chemistry: 70,
+    region: region as any,
+  };
+}
+
 export function computeTeamOverall(team: Team): number {
   const n = team.roster.length || 1;
   const sum = team.roster.reduce((acc, p) => {
@@ -382,6 +458,8 @@ export function createDefaultSeason(): Season {
       focus: "balanced",
       defensiveIntensity: "neutral",
     },
+    recruitingPoints: 100,
+    nilBudget: 50000,
     history: [],
     postseasonStatus: null,
     news: [{
@@ -459,6 +537,7 @@ export function generateProspects(
       heightInches: randomHeight(position),
       skinTone: pickSkinTone(),
       hairColor: pickHairColor(),
+      nilOffer: 0,
     });
   }
   return prospects;

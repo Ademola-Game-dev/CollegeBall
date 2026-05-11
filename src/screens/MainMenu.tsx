@@ -42,7 +42,7 @@ const SUPPORT_RIBBON = [
 
 export default function MainMenu() {
   const startExhibition = useGameStore((s) => s.startExhibition);
-  const startSeason     = useGameStore((s) => s.startSeason);
+  const setScreen       = useGameStore((s) => s.setScreen);
   const homeTeam        = useGameStore((s) => s.homeTeam);
   const awayTeam        = useGameStore((s) => s.awayTeam);
 
@@ -113,7 +113,7 @@ export default function MainMenu() {
                     Start Exhibition
                   </button>
                   <button
-                    onClick={startSeason}
+                    onClick={() => setScreen("new-game")}
                     className="rounded-full border border-cyan-300/20 bg-cyan-300/8 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-300/14"
                   >
                     Season Hub

@@ -27,6 +27,8 @@ export default function RecruitingScreen() {
   const prospects      = useGameStore((s) => s.prospects);
   const scoutingPoints = useGameStore((s) => s.scoutingPoints);
   const scoutProspect  = useGameStore((s) => s.scoutProspect);
+  const contactProspect = useGameStore((s) => s.contactProspect);
+  const offerNil       = useGameStore((s) => s.offerNil);
   const offerProspect  = useGameStore((s) => s.offerProspect);
   const finishRecruiting = useGameStore((s) => s.finishRecruiting);
 
@@ -79,24 +81,30 @@ export default function RecruitingScreen() {
 
         <main className="flex flex-1 flex-col gap-5 py-5">
           {/* Summary cards */}
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-4">
             <SummaryCard
-              label="Scouting Points"
-              value={scoutingPoints}
+              label="Recruiting Points"
+              value={season.recruitingPoints}
               color="cyan"
-              note="Spend to reveal a prospect's true rating"
+              note="Spend on scouting and contact"
             />
             <SummaryCard
-              label="Open Roster Spots"
-              value={openSpots}
+              label="NIL Budget"
+              value={`$${(season.nilBudget / 1000).toFixed(1)}k`}
               color="amber"
-              note={`${graduatingSeniors.length} senior${graduatingSeniors.length !== 1 ? "s" : ""} graduating`}
+              note="Fund NIL deals for top prospects"
+            />
+            <SummaryCard
+              label="Open Spots"
+              value={openSpots}
+              color="cyan"
+              note={`${graduatingSeniors.length} graduating seniors`}
             />
             <SummaryCard
               label="Committed"
               value={committed.length}
               color="emerald"
-              note={offered.length > 0 ? `${offered.length} offer${offered.length !== 1 ? "s" : ""} pending` : "No pending offers"}
+              note={`${offered.length} scholarship offers pending`}
             />
           </div>
 
@@ -200,10 +208,14 @@ export default function RecruitingScreen() {
                 <ProspectRow
                   key={p.id}
                   prospect={p}
-                  canScout={scoutingPoints > 0 && !p.scouted}
+                  canScout={season.recruitingPoints >= 10 && !p.scouted}
+                  canContact={season.recruitingPoints >= 5 && !p.committed}
                   onScout={() => scoutProspect(p.id)}
+                  onContact={() => contactProspect(p.id)}
+                  onOfferNil={(amt) => offerNil(p.id, amt)}
                   onOffer={() => offerProspect(p.id)}
                   userRegion={season.team.region}
+                  nilBudget={season.nilBudget}
                 />
               ))
             )}
@@ -225,7 +237,7 @@ interface SummaryCardProps {
   note: string;
 }
 
-function SummaryCard({ label, value, color, note }: SummaryCardProps) {
+function SummaryCard({ label, value, color, note }: { label: string; value: string | number; color: string; note: string }) {
   const borderCls = color === "cyan"    ? "border-cyan-300/15"   :
                     color === "amber"   ? "border-amber-300/15"  :
                                           "border-emerald-400/15";
@@ -250,10 +262,13 @@ function SummaryCard({ label, value, color, note }: SummaryCardProps) {
 interface ProspectRowProps {
   prospect: Prospect;
   canScout: boolean;
+  canContact: boolean;
   onScout: () => void;
+  onContact: () => void;
+  onOfferNil: (amt: number) => void;
   onOffer: () => void;
   userRegion?: string;
-  key?: any;
+  nilBudget: number;
 }
 
 function ProspectRow({ 
@@ -351,9 +366,9 @@ function ProspectRow({
       </div>
 
       {/* Status / Actions */}
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:max-w-[280px]">
         {statusBadge ? (
-          <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${statusBadge.cls}`}>
+          <span className={`rounded-full border px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] ${statusBadge.cls}`}>
             {statusBadge.label}
           </span>
         ) : (
@@ -362,23 +377,48 @@ function ProspectRow({
               <button
                 onClick={onScout}
                 disabled={!canScout}
-                className={`rounded-[18px] border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition ${
+                title="Costs 10 Recruiting Points"
+                className={`rounded-full border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition ${
                   canScout
                     ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200 hover:bg-cyan-300/20 active:scale-95"
-                    : "cursor-not-allowed border-white/8 bg-white/5 text-white/25"
+                    : "cursor-not-allowed border-white/5 bg-white/2 text-white/15"
                 }`}
               >
                 Scout
               </button>
             )}
+            
+            <button
+              onClick={onContact}
+              disabled={!canContact}
+              title="Costs 5 Recruiting Points"
+              className={`rounded-full border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition ${
+                canContact
+                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20 active:scale-95"
+                  : "cursor-not-allowed border-white/5 bg-white/2 text-white/15"
+              }`}
+            >
+              Contact
+            </button>
+
+            {p.scouted && nilBudget >= 5000 && (
+              <button
+                onClick={() => onOfferNil(5000)}
+                className="rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-amber-200 transition hover:bg-amber-400/20 active:scale-95"
+              >
+                +$5k NIL
+              </button>
+            )}
+
             <button
               onClick={onOffer}
-              className="rounded-[18px] border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200 transition hover:bg-amber-300/20 active:scale-95"
+              className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-white/20 active:scale-95"
             >
               Offer
             </button>
           </>
         )}
+      </div>
       </div>
     </div>
   );

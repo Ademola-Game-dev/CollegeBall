@@ -269,7 +269,7 @@ export interface SimEvent {
 // Game State (UI-level)
 // ---------------------------------------------------------------------------
 
-export type Screen = "menu" | "game" | "season" | "recruiting";
+export type Screen = "menu" | "game" | "season" | "recruiting" | "new-game";
 
 export type GameSpeed = 1 | 2 | 4;
 
@@ -435,6 +435,10 @@ export interface Season {
   recruitingClassRating: number;
   /** Active tactical settings for the team. */
   gamePlan: GamePlan;
+  /** Points available for recruiting actions this week. */
+  recruitingPoints: number;
+  /** Current NIL budget available to offer prospects. */
+  nilBudget: number;
   /** Historical records of past seasons in this career. */
   history: SeasonHistory[];
   /** Current postseason status (e.g. "Final Four", "Round of 64", null). */
@@ -498,6 +502,10 @@ export interface Prospect {
   region: "West" | "Midwest" | "East" | "South";
   /** Likelihood (0–1) that the prospect commits when offered a scholarship. */
   interestLevel: number;
+  /** Current NIL (Name, Image, Likeness) offer amount from the user. */
+  nilOffer: number;
+  /** Revealed ratings after scouting. If not scouted, these may be hidden or estimated. */
+  scoutedRatings?: Partial<PlayerRatings>;
   /** Whether the user has offered a scholarship to this prospect. */
   offered: boolean;
   /** Whether the prospect has committed to the user's program. */

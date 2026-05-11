@@ -109,8 +109,8 @@ export interface GameStore {
   season: Season | null;
   /** Whether the current in-progress game belongs to a season or is a standalone exhibition. */
   gameContext: "exhibition" | "season";
-  /** Start a new default season and navigate to the season hub. */
-  startSeason: () => void;
+  /** Start a new season with a selected team and custom coach. */
+  startSeason: (team: Team, coach: Coach) => void;
   /** Launch the next scheduled season game in the 3D engine. */
   playSeasonGame: () => void;
   /** Instantly resolve the next scheduled season game without 3D rendering. */
@@ -130,10 +130,16 @@ export interface GameStore {
   scoutingPoints: number;
   /** Scout a prospect (costs 1 point; reveals true rating). */
   scoutProspect: (prospectId: string) => void;
+  /** Contact a prospect to increase interest. */
+  contactProspect: (prospectId: string) => void;
+  /** Offer an NIL package to a prospect. */
+  offerNil: (prospectId: string, amount: number) => void;
   /** Offer a scholarship to a prospect. */
   offerProspect: (prospectId: string) => void;
+  /** Advance to the next week in the season (regenerates recruiting points). */
+  advanceWeek: () => void;
   /**
-   * with the refreshed roster and a new season schedule.
+   * Finish recruiting: add committed prospects to the team roster and start the next year.
    */
   finishRecruiting: () => void;
   /** Upgrade the team's NIL collective level (costs budget). */
@@ -283,8 +289,13 @@ export const useGameStore = create<GameStore>((set) => ({
     }),
 
   // Season / Head Coach mode
-  startSeason: () =>
-    set({ season: createDefaultSeason(), screen: "season" }),
+  startSeason: (selectedTeam: import("../game/types").Team, coach: import("../game/types").Coach) =>
+    set({ 
+      season: createInitialSeason(selectedTeam, coach, defaultGameSettings), 
+      screen: "season",
+      gameContext: "season",
+      prospects: generateProspects(60, coach.recruiting, selectedTeam.region),
+    }),
 
   playSeasonGame: () =>
     set((state) => {
@@ -615,21 +626,71 @@ export const useGameStore = create<GameStore>((set) => ({
 
   scoutProspect: (prospectId: string) =>
     set((state) => {
-      if (state.scoutingPoints <= 0) return state;
+      if (!state.season || state.season.recruitingPoints <= 0) return state;
       return {
         prospects: state.prospects.map((p) => {
           if (p.id === prospectId) {
-            // Narrow the potential range (OOTP style)
+            // Reveal archetype and narrow potential range
             const center = (p.potentialRange[0] + p.potentialRange[1]) / 2;
             const narrowRange: [number, number] = [
-              Math.max(0, Math.round(center - 3)),
-              Math.min(100, Math.round(center + 3))
+              Math.max(0, Math.round(center - 2)),
+              Math.min(100, Math.round(center + 2))
             ];
-            return { ...p, scouted: true, potentialRange: narrowRange };
+            return { 
+              ...p, 
+              scouted: true, 
+              potentialRange: narrowRange,
+              scoutedRatings: { 
+                speed: p.rating + (Math.random() - 0.5) * 5,
+                shooting: p.rating + (Math.random() - 0.5) * 5,
+              } 
+            };
           }
           return p;
         }),
-        scoutingPoints: state.scoutingPoints - 1,
+        season: {
+          ...state.season,
+          recruitingPoints: state.season.recruitingPoints - 10,
+        },
+      };
+    }),
+
+  contactProspect: (prospectId: string) =>
+    set((state) => {
+      if (!state.season || state.season.recruitingPoints < 5) return state;
+      return {
+        prospects: state.prospects.map((p) => {
+          if (p.id === prospectId) {
+            return { ...p, interestLevel: Math.min(0.99, p.interestLevel + 0.04) };
+          }
+          return p;
+        }),
+        season: {
+          ...state.season,
+          recruitingPoints: state.season.recruitingPoints - 5,
+        },
+      };
+    }),
+
+  offerNil: (prospectId: string, amount: number) =>
+    set((state) => {
+      if (!state.season || state.season.nilBudget < amount) return state;
+      return {
+        prospects: state.prospects.map((p) => {
+          if (p.id === prospectId) {
+            const interestBoost = amount / 250000; // $10k = ~4% boost
+            return { 
+              ...p, 
+              nilOffer: p.nilOffer + amount, 
+              interestLevel: Math.min(0.99, p.interestLevel + interestBoost) 
+            };
+          }
+          return p;
+        }),
+        season: {
+          ...state.season,
+          nilBudget: state.season.nilBudget - amount,
+        },
       };
     }),
 
@@ -651,6 +712,7 @@ export const useGameStore = create<GameStore>((set) => ({
    * Finish recruiting: add committed prospects to the team roster, create a new
    * season schedule, and navigate back to the season hub.
    */
+  advanceWeek: () => void;
   finishRecruiting: () =>
     set((state) => {
       const { season, prospects } = state;
@@ -712,6 +774,40 @@ export const useGameStore = create<GameStore>((set) => ({
         prospects: [],
         scoutingPoints: 0,
         screen: "season" as Screen,
+      };
+    }),
+
+  advanceWeek: () =>
+    set((state) => {
+      const { season, prospects } = state;
+      if (!season) return state;
+
+      // 1. Regenerate recruiting points
+      const basePoints = 100 + (season.coach.recruiting / 100) * 50;
+      const newPoints = Math.round(basePoints);
+
+      // 2. Simulate AI recruiting (other teams)
+      // Prospects lose interest if the user doesn't contact them, or if others offer more.
+      const updatedProspects = prospects.map((p) => {
+        if (p.committed) return p;
+        
+        // Decay interest slightly each week
+        let interest = p.interestLevel * 0.96;
+        
+        // AI competition: higher rated prospects are harder to keep interested
+        const competitionFactor = (p.rating / 100) * 0.05;
+        interest -= competitionFactor;
+
+        return { ...p, interestLevel: Math.max(0.01, Math.min(0.99, interest)) };
+      });
+
+      return {
+        season: {
+          ...season,
+          recruitingPoints: newPoints,
+          currentGameIndex: season.currentGameIndex + 1,
+        },
+        prospects: updatedProspects,
       };
     }),
 
