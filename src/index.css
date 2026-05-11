@@ -3,10 +3,11 @@
 @tailwind utilities;
 
 :root {
-  color: rgba(255, 255, 255, 0.96);
-  background: #040a12;
-  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
-  text-rendering: geometricPrecision;
+  color: rgba(255, 255, 255, 0.98);
+  background: #04080f;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 html,
@@ -35,6 +36,7 @@ body::before {
     linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
   background-size: 100% 36px, 36px 100%;
   mask-image: radial-gradient(circle at center, black 30%, transparent 85%);
+  -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 85%);
   opacity: 0.2;
 }
 
@@ -142,4 +144,89 @@ button {
 
 .feed-entry {
   animation: feedSlideIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* ─────────────────────────────────────────────
+   Premium AAA Utility Classes
+───────────────────────────────────────────── */
+
+.glass-thin {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-medium {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-thick {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 30px rgba(34, 211, 238, 0.15), 0 0 100px rgba(34, 211, 238, 0.05);
+}
+
+.glow-amber {
+  box-shadow: 0 0 30px rgba(245, 158, 11, 0.15), 0 0 100px rgba(245, 158, 11, 0.05);
+}
+
+.text-gradient-cyan {
+  background: linear-gradient(to bottom right, #fff, #22d3ee);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes pan {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 100% 100%; }
+}
+
+.animate-pan {
+  animation: pan 60s linear infinite;
+}
+
+/* ─────────────────────────────────────────────
+   Responsive & Device Compatibility
+───────────────────────────────────────────── */
+
+.safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+@media (max-width: 768px) {
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+  .mobile-hide {
+    display: none !important;
+  }
+  .mobile-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mobile-text-sm {
+    font-size: 0.875rem !important;
+  }
+}
+
+/* Chrome/Safari fixes for backdrop filters */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-medium, .glass-thick {
+    background: rgba(15, 23, 42, 0.95) !important;
+  }
 }

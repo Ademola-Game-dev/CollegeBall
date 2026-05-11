@@ -10,7 +10,7 @@ import { useGameStore } from "../store/gameStore";
 import type { Coach, Season, SeasonGame, SeasonRecord } from "../game/types";
 import type { Player, PlayerGameStats } from "../game/types";
 
-const TABS = ["Dashboard", "Roster", "Schedule", "Rankings", "History", "News"] as const;
+const TABS = ["Dashboard", "Coach", "Roster", "Schedule", "Rankings", "History", "News"] as const;
 type Tab = (typeof TABS)[number];
 
 const POSITION_LABELS: Record<string, string> = {
@@ -30,7 +30,10 @@ export default function SeasonHub() {
   const setScreen          = useGameStore((s) => s.setScreen);
   const upgradeNILCollective = useGameStore((s) => s.upgradeNILCollective);
   const upgradeCoach       = useGameStore((s) => s.upgradeCoach);
+  const upgradeCoachTrait  = useGameStore((s) => s.upgradeCoachTrait);
   const updateGamePlan     = useGameStore((s) => s.updateGamePlan);
+  const stayAtSchool       = useGameStore((s) => s.stayAtSchool);
+  const isSimulating      = useGameStore((s) => s.isSimulating);
 
   if (!season) {
     return (
@@ -53,44 +56,88 @@ export default function SeasonHub() {
   return (
     <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07111b] pb-[max(1rem,env(safe-area-inset-bottom,0px))] text-white">
       <SeasonBackgroundLayers />
+      
+      {isSimulating && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-cyan-400 border-t-transparent shadow-[0_0_20px_rgba(34,211,238,0.4)]" />
+            <div className="text-[11px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Simulating...</div>
+          </div>
+        </div>
+      )}
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1200px] flex-col px-5 py-5 sm:px-8 sm:py-7">
-        {/* ---- Header ---- */}
-        <header className="flex items-start justify-between gap-4 border-b border-white/8 pb-5">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.45em] text-cyan-200/70">
-              Head Coach Mode
+        {/* ---- Broadcast Header ---- */}
+        <header className="relative flex flex-col gap-6 border-b border-white/5 pb-8 lg:flex-row lg:items-end lg:justify-between mobile-stack">
+          <div className="flex items-center gap-6">
+            <div 
+              className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/10 shadow-2xl"
+              style={{ background: `linear-gradient(135deg, ${season.team.primaryColor}, ${season.team.secondaryColor})` }}
+            >
+              <div className="absolute inset-0 bg-black/10" />
+              <span className="relative z-10 text-4xl font-black italic tracking-tighter text-white drop-shadow-lg">
+                {season.team.abbreviation}
+              </span>
+              <div className="absolute -bottom-2 -right-2 h-12 w-12 rounded-full bg-white/10 blur-xl" />
             </div>
-            <h1 className="mt-2 text-4xl font-black uppercase leading-none tracking-[0.04em] text-white sm:text-5xl">
-              Season Hub
-            </h1>
-            <p className="mt-2 text-sm text-white/50">
-              {season.team.name} {season.team.nickname} · {season.year} Season
-            </p>
+            
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="rounded-full bg-cyan-400 px-3 py-0.5 text-[10px] font-black uppercase tracking-widest text-slate-950">
+                  {season.rank ? `#${season.rank}` : "Unranked"}
+                </span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.4em] text-white/30">
+                  Week {season.currentGameIndex + 1} · {season.year} Campaign
+                </span>
+              </div>
+              <h1 className="mt-2 text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">
+                {season.team.name}
+              </h1>
+              <div className="mt-1 flex items-center gap-2 text-sm font-medium text-white/40">
+                <span>{season.team.nickname}</span>
+                <span className="h-1 w-1 rounded-full bg-white/20" />
+                <span className="text-cyan-400/80">{season.conferenceName} Conference</span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => setScreen("menu")}
-            className="mt-1 shrink-0 rounded-full border border-white/12 bg-white/5 px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.18em] text-white/60 transition hover:bg-white/10"
-          >
-            Main Menu
-          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end px-4 border-r border-white/10">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">NIL Budget</span>
+              <span className="text-xl font-black text-white">${(season.nilBudget / 1000).toFixed(1)}k</span>
+            </div>
+            <button
+              onClick={() => setScreen("menu")}
+              className="group flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 transition hover:bg-white/10"
+              title="Return to Menu"
+            >
+              <svg className="h-5 w-5 text-white/40 transition group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
         </header>
 
-        {/* ---- Tab Navigation ---- */}
-        <nav className="mt-4 flex gap-1 overflow-x-auto pb-2 scrollbar-hide">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap rounded-full px-5 py-2 text-[11px] font-bold uppercase tracking-[0.2em] transition ${
-                activeTab === tab
-                  ? "bg-cyan-400 text-black shadow-[0_0_20px_rgba(34,211,238,0.3)]"
-                  : "text-white/40 hover:bg-white/5 hover:text-white/60"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+        {/* ---- Navigation ---- */}
+        <nav className="sticky top-0 z-40 -mx-5 mt-4 bg-[#07111b]/80 px-5 py-3 backdrop-blur-md lg:mx-0 lg:rounded-2xl lg:px-6">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`relative shrink-0 rounded-xl px-6 py-2.5 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${
+                  activeTab === tab
+                    ? "bg-white text-slate-950 shadow-[0_10px_30px_rgba(255,255,255,0.2)]"
+                    : "text-white/40 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <div className="absolute -bottom-1 left-1/2 h-1 w-6 -translate-x-1/2 rounded-full bg-cyan-400" />
+                )}
+              </button>
+            ))}
+          </div>
         </nav>
 
         <main className="flex flex-1 flex-col gap-5 py-5">
@@ -113,12 +160,31 @@ export default function SeasonHub() {
                 </div>
               </div>
 
+              {season.postseasonStatus !== "none" && season.postseasonStatus !== "complete" && (
+                <div className="glass-thick relative overflow-hidden rounded-[32px] border border-cyan-400/30 p-8 shadow-[0_0_40px_rgba(34,211,238,0.1)]">
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/10 to-transparent" />
+                  <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400">Postseason Active</div>
+                      <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">The Tournament Awaits</h2>
+                      <p className="mt-1 text-sm text-white/50">Your team has qualified for postseason play. Prepare your strategy.</p>
+                    </div>
+                    <button 
+                      onClick={() => setScreen("tournaments")}
+                      className="rounded-2xl bg-cyan-400 px-10 py-4 text-[11px] font-black uppercase tracking-widest text-slate-950 transition hover:bg-cyan-300 active:scale-95 shadow-[0_0_20px_rgba(34,211,238,0.4)]"
+                    >
+                      Enter Bracket
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* ---- Next game or season-complete banner ---- */}
               {isSeasonComplete ? (
                 <SeasonCompleteCard 
                   record={season.record} 
                   rank={season.rank}
-                  onNewSeason={startSeason} 
+                  onNewSeason={() => setScreen("menu")} 
                   onAdvanceSeason={advanceSeason} 
                 />
               ) : (
@@ -139,7 +205,46 @@ export default function SeasonHub() {
             </>
           )}
 
-          {activeTab === "Roster" && (
+              {activeTab === "Coach" && (
+                <div className="flex flex-col gap-8">
+                  <CoachProfilePanel coach={season.coach} onUpgrade={upgradeCoach} onUpgradeTrait={upgradeCoachTrait} />
+                  
+                  {/* Job Offers Banner if available */}
+                  {season.jobOffers && season.jobOffers.length > 0 && (
+                    <div className="glass-thick relative overflow-hidden rounded-[32px] border border-cyan-400/30 p-8 shadow-[0_0_40px_rgba(34,211,238,0.1)]">
+                      <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/10 to-transparent" />
+                      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400">Carousel Opportunity</div>
+                          <h2 className="mt-2 text-3xl font-black uppercase italic tracking-tight text-white">Pending Job Offers</h2>
+                          <p className="mt-1 text-sm text-white/50">Your performance has caught the eye of other programs. Review your options before the new year.</p>
+                        </div>
+                        <div className="flex gap-4">
+                           <button 
+                            onClick={() => setScreen("jobOffers")}
+                            className="rounded-2xl bg-cyan-400 px-8 py-3.5 text-[11px] font-black uppercase tracking-widest text-slate-950 transition hover:bg-cyan-300 active:scale-95 shadow-[0_0_20px_rgba(34,211,238,0.4)]"
+                           >
+                            View Offers ({season.jobOffers.length})
+                           </button>
+                           <button 
+                            onClick={stayAtSchool}
+                            className="rounded-2xl border border-white/10 bg-white/5 px-8 py-3.5 text-[11px] font-black uppercase tracking-widest text-white/70 transition hover:bg-white/10 active:scale-95"
+                           >
+                            Stay at {season.team.name}
+                           </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid gap-8 lg:grid-cols-2">
+                    <CareerHistoryPanel history={season.coach.history} currentTeam={season.team.name} currentRecord={season.record} />
+                    <CoachTraitsPanel coach={season.coach} onUpgrade={upgradeCoachTrait} />
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "Roster" && (
             <>
               <RosterPanel season={season} />
               {season.gamesPlayedWithStats > 0 && (
@@ -266,42 +371,42 @@ interface CoachCardProps {
 
 function CoachCard({ coach, season, onUpgrade }: CoachCardProps) {
   const attrs: { label: string; key: "offense" | "defense" | "recruiting" | "development" }[] = [
-    { label: "Offense",     key: "offense" },
-    { label: "Defense",     key: "defense" },
-    { label: "Recruiting",  key: "recruiting" },
-    { label: "Development", key: "development" },
+    { label: "Off", key: "offense" },
+    { label: "Def", key: "defense" },
+    { label: "Rec", key: "recruiting" },
+    { label: "Dev", key: "development" },
   ];
 
+  const xpNeeded = coach.level * 120 + 80;
+  const xpPct = (coach.experience / xpNeeded) * 100;
+
   return (
-    <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[linear-gradient(135deg,rgba(6,14,23,0.97),rgba(5,10,18,0.85))] px-6 py-7 sm:px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_40%)]" />
+    <div className="group relative overflow-hidden rounded-[40px] border border-white/10 bg-slate-950/40 p-8 transition-all hover:border-white/20">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.1),transparent_50%)]" />
+      
       <div className="relative">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.4em] text-cyan-200/65">
-          Head Coach
-        </div>
-        <div className="mt-3 flex items-center justify-between">
-          <div className="text-3xl font-black uppercase tracking-[0.06em] text-white">
-            {coach.firstName} {coach.lastName}
-          </div>
-          <div className="flex flex-col items-end">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">Level {coach.level}</div>
-            <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
-              <div 
-                className="h-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]" 
-                style={{ width: `${(coach.experience / (coach.level * 120 + 80)) * 100}%` }} 
-              />
+        <div className="flex items-start justify-between">
+          <div className="flex flex-col">
+            <div className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Coach Profile</div>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{coach.firstName} {coach.lastName}</h2>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">Level {coach.level}</span>
+              <div className="h-3 w-px bg-white/10" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">{coach.careerWins}–{coach.careerLosses} Career</span>
             </div>
           </div>
-        </div>
-        <div className="mt-1 flex items-center gap-2 text-sm text-white/55">
-          <span>{season.team.name}</span>
-          <span className="text-white/20">|</span>
-          <span className="font-mono text-[11px] uppercase tracking-wider text-white/40">
-            {coach.careerWins}–{coach.careerLosses} Career
-          </span>
+          
+          {/* Level Circle */}
+          <div className="relative flex h-16 w-16 items-center justify-center">
+            <svg className="absolute inset-0 h-full w-full -rotate-90">
+              <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-white/5" />
+              <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-cyan-400 shadow-lg" strokeDasharray={176} strokeDashoffset={176 - (176 * xpPct) / 100} strokeLinecap="round" />
+            </svg>
+            <span className="text-sm font-black text-white">{Math.round(xpPct)}%</span>
+          </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-8 grid grid-cols-2 gap-3">
           {attrs.map(({ label, key }) => (
             <CoachAttr 
               key={label} 
@@ -312,15 +417,17 @@ function CoachCard({ coach, season, onUpgrade }: CoachCardProps) {
             />
           ))}
         </div>
+
         {coach.skillPoints > 0 && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl bg-amber-400/10 p-3 border border-amber-400/20">
-            <span className="text-amber-400">
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+          <div className="mt-4 flex animate-pulse items-center gap-3 rounded-2xl bg-amber-400/10 p-4 border border-amber-400/20">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-slate-950">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
               </svg>
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-[0.1em] text-amber-200">
+              {coach.skillPoints} Skill Point{coach.skillPoints !== 1 ? 's' : ''} Ready
             </span>
-            <span className="text-[10px] font-black uppercase tracking-wider text-amber-200">{coach.skillPoints} Skill Point{coach.skillPoints !== 1 ? 's' : ''} available!</span>
           </div>
         )}
       </div>
@@ -386,45 +493,40 @@ function RecordCard({ record, conferenceRecord, conferenceName, gamesPlayed, tot
     : 0;
 
   return (
-    <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[linear-gradient(135deg,rgba(6,14,23,0.97),rgba(5,10,18,0.85))] px-6 py-7 sm:px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.14),transparent_40%)]" />
+    <div className="group relative overflow-hidden rounded-[40px] border border-white/10 bg-slate-950/40 p-8 transition-all hover:border-white/20">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.08),transparent_50%)]" />
       <div className="relative">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.4em] text-amber-200/65">
-          Season Record
-        </div>
-        <div className="mt-3 flex items-baseline gap-4">
-          <span className="text-5xl font-black text-white">{record.wins}</span>
-          <span className="text-3xl font-black text-white/30">–</span>
-          <span className="text-5xl font-black text-white/60">{record.losses}</span>
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">
+            Season Record
+          </div>
           {rank && (
-            <span className="ml-auto rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-sm font-black text-amber-300">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400 text-xs font-black text-slate-950 glow-amber">
               #{rank}
-            </span>
-          )}
-        </div>
-        <div className="mt-2 text-sm text-white/50">
-          {gamesPlayed} of {total} games played
-          {gamesPlayed > 0 && (
-            <span className="ml-2 text-white/35">· {pct}% win</span>
+            </div>
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-[20px] border border-white/10 bg-black/18 px-4 py-3 backdrop-blur-sm">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/38">
-              Overall W–L
-            </div>
-            <div className="mt-1.5 text-xl font-black text-white">
-              {record.wins}–{record.losses}
-            </div>
+        <div className="mt-6 flex items-center gap-4">
+          <div className="flex flex-col">
+            <span className="text-7xl font-black tracking-tighter text-white">{record.wins}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Wins</span>
           </div>
-          <div className="rounded-[20px] border border-cyan-300/15 bg-cyan-300/5 px-4 py-3 backdrop-blur-sm">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-200/55">
-              {conferenceName}
-            </div>
-            <div className="mt-1.5 text-xl font-black text-cyan-100">
-              {conferenceRecord.wins}–{conferenceRecord.losses}
-            </div>
+          <div className="h-12 w-px bg-white/10" />
+          <div className="flex flex-col">
+            <span className="text-7xl font-black tracking-tighter text-white/40">{record.losses}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Losses</span>
+          </div>
+        </div>
+
+        <div className="mt-8 space-y-4">
+          <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">{conferenceName}</span>
+            <span className="text-sm font-black text-cyan-400">{conferenceRecord.wins}–{conferenceRecord.losses}</span>
+          </div>
+          <div className="flex items-center justify-between px-2">
+            <span className="text-[10px] font-medium text-white/30">{gamesPlayed} of {total} Played</span>
+            <span className="text-[10px] font-black text-white/60">{pct}% Win</span>
           </div>
         </div>
       </div>
@@ -437,42 +539,35 @@ function EconomyCard({ season, onUpgradeNIL }: { season: Season; onUpgradeNIL: (
   const canAfford = season.budget >= nilUpgradeCost && season.nilCollectiveLevel < 10;
 
   return (
-    <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[linear-gradient(135deg,rgba(6,14,23,0.97),rgba(5,10,18,0.85))] px-6 py-7 sm:px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(34,197,94,0.14),transparent_40%)]" />
+    <div className="glass-medium relative overflow-hidden rounded-[32px] p-6">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(34,197,94,0.1),transparent_40%)]" />
       <div className="relative">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.4em] text-emerald-300/65">
+        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-400/40">
           Program Economy
         </div>
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-4xl font-black text-white">${season.budget.toLocaleString()}</span>
-          <span className="text-sm text-white/45">Budget</span>
+        
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-3xl font-black text-white">${season.budget.toLocaleString()}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Available Budget</span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-xl font-black text-emerald-400">${(season.nilBudget / 1000).toFixed(1)}k</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/30">NIL Fund</span>
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between rounded-[20px] border border-white/8 bg-black/20 p-4">
-            <div>
-              <div className="text-[9px] font-bold uppercase tracking-[0.25em] text-emerald-400/70">NIL Budget</div>
-              <div className="mt-1 text-xl font-black text-white">${(season.nilBudget / 1000).toFixed(1)}k</div>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-
+        <div className="mt-6">
           <button
             disabled={!canAfford}
             onClick={onUpgradeNIL}
-            className={`group relative overflow-hidden rounded-[20px] py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 ${
+            className={`group w-full rounded-2xl py-3.5 text-[11px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 ${
               canAfford
-                ? "bg-emerald-500 text-white shadow-[0_10px_20px_rgba(16,185,129,0.2)] hover:bg-emerald-400"
+                ? "bg-emerald-500 text-white shadow-[0_10px_30px_rgba(16,185,129,0.2)] hover:bg-emerald-400"
                 : "bg-white/5 text-white/20 cursor-not-allowed"
             }`}
           >
-            <span className="relative z-10">
-              {season.nilCollectiveLevel >= 10 ? "Max NIL Level" : `Raise Funds ($${nilUpgradeCost.toLocaleString()})`}
-            </span>
+            {season.nilCollectiveLevel >= 10 ? "Max NIL Level" : `Raise Funds ($${nilUpgradeCost.toLocaleString()})`}
           </button>
         </div>
       </div>
@@ -482,20 +577,28 @@ function EconomyCard({ season, onUpgradeNIL }: { season: Season; onUpgradeNIL: (
 
 function RecruitingCard({ season, onRecruit }: { season: Season; onRecruit: () => void }) {
   return (
-    <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[linear-gradient(135deg,rgba(6,14,23,0.97),rgba(5,10,18,0.85))] px-6 py-7 sm:px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.14),transparent_40%)]" />
+    <div className="glass-medium relative overflow-hidden rounded-[32px] p-6">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.1),transparent_40%)]" />
       <div className="relative">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.4em] text-cyan-300/65">
+        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400/40">
           Recruiting Pipeline
         </div>
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-4xl font-black text-white">{season.recruitingPoints}</span>
-          <span className="text-sm text-white/45">Weekly Pts</span>
+        
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-3xl font-black text-white">{season.recruitingPoints}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Recruiting Points</span>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-cyan-400/10 flex items-center justify-center text-cyan-400">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
         </div>
 
         <button
           onClick={onRecruit}
-          className="mt-6 w-full rounded-2xl bg-cyan-400 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 transition-all hover:bg-cyan-300 active:scale-95"
+          className="mt-6 w-full rounded-2xl bg-cyan-400 py-3.5 text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 transition-all hover:bg-cyan-300 active:scale-95"
         >
           Open Recruiting
         </button>
@@ -511,49 +614,87 @@ interface NextGameCardProps {
 }
 
 function NextGameCard({ game, onPlay, onSim }: NextGameCardProps) {
+  const oppOverall = computeTeamOverall(game.opponent);
+  
   return (
-    <div
-      className="relative overflow-hidden rounded-[36px] border border-amber-200/18 px-6 py-7 shadow-[0_28px_80px_rgba(0,0,0,0.3)] sm:px-8"
-      style={{
-        background: `linear-gradient(135deg, ${game.opponent.primaryColor}28, rgba(6,14,23,0.96))`,
-      }}
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.12),transparent_40%)]" />
-      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.42em] text-amber-200/72">
-            Week {game.week} · {game.isHome ? "Home" : "Away"}
-          </div>
-          <h2 className="mt-3 text-3xl font-black uppercase tracking-[0.06em] text-white sm:text-4xl">
-            vs {game.opponent.abbreviation}
-          </h2>
-          <p className="mt-1 text-sm text-white/60">{game.opponent.name}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/55">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: game.opponent.primaryColor }}
-              />
-              OVR: {game.opponent.overall}
+    <div className="glass-thick group relative overflow-hidden rounded-[40px] p-8 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
+      <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-amber-400/5 blur-[100px]" />
+      
+      <div className="relative flex flex-col gap-10 lg:flex-row lg:items-center">
+        {/* Matchup Visual */}
+        <div className="flex flex-1 items-center justify-between gap-6 px-4">
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative h-24 w-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-3xl font-black italic shadow-inner group-hover:scale-105 transition-transform duration-500">
+               <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-400/10 to-transparent" />
+               US
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-200/60">
-              Scouting: {game.opponent.overall > 80 ? "Elite Frontcourt" : game.opponent.overall > 70 ? "Balanced Attack" : "Rebuilding"}
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Home Program</span>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="text-[11px] font-black uppercase tracking-[0.8em] text-amber-400/50">VS</div>
+            <div className="mt-2 h-px w-12 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <div 
+              className="relative h-24 w-24 rounded-full border border-white/20 flex items-center justify-center text-3xl font-black italic shadow-[0_0_40px_rgba(0,0,0,0.4)] group-hover:scale-105 transition-transform duration-500"
+              style={{ background: `linear-gradient(135deg, ${game.opponent.primaryColor}, ${game.opponent.secondaryColor})` }}
+            >
+              <div className="absolute inset-0 rounded-full bg-black/10" />
+              <span className="relative z-10">{game.opponent.abbreviation}</span>
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">{game.isHome ? "Away Program" : "Home Program"}</span>
+          </div>
+        </div>
+
+        {/* Info & Stats */}
+        <div className="flex-[1.2] space-y-6 lg:border-l lg:border-white/5 lg:pl-10">
+          <div>
+            <div className="flex items-center gap-3">
+               <span className="rounded-lg bg-amber-400/10 border border-amber-400/20 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-400">Week {game.week}</span>
+               <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Gameday Preview</span>
+            </div>
+            <h2 className="mt-4 text-4xl font-black uppercase italic tracking-tighter text-white sm:text-5xl">{game.opponent.name}</h2>
+            <div className="text-sm font-bold text-white/40">{game.opponent.nickname}</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+                <span>Power Rating</span>
+                <span className="text-white">{oppOverall}</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                <div className="h-full bg-gradient-to-r from-amber-400 to-orange-500 shadow-[0_0_10px_rgba(251,191,36,0.4)] transition-all duration-1000" style={{ width: `${oppOverall}%` }} />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+                <span>Threat Level</span>
+                <span className={oppOverall > 80 ? "text-red-400" : "text-emerald-400"}>{oppOverall > 80 ? "EXTREME" : "MODERATE"}</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                <div className={`h-full transition-all duration-1000 ${oppOverall > 80 ? 'bg-red-500' : 'bg-emerald-400'}`} style={{ width: `${oppOverall}%` }} />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 sm:items-end">
+        {/* Actions */}
+        <div className="flex flex-col gap-4 min-w-[220px]">
           <button
             onClick={onPlay}
-            className="rounded-[22px] bg-amber-300 px-7 py-3.5 text-sm font-black uppercase tracking-[0.2em] text-slate-950 transition hover:bg-amber-200 active:scale-95"
+            className="group relative flex h-16 w-full items-center justify-center overflow-hidden rounded-3xl bg-white text-slate-950 transition-all hover:bg-amber-400 active:scale-95 shadow-[0_20px_40px_rgba(255,255,255,0.1)]"
           >
-            Play Game
+            <span className="relative z-10 text-xs font-black uppercase tracking-[0.3em]">Enter Match</span>
           </button>
           <button
             onClick={onSim}
-            className="rounded-[22px] border border-white/12 bg-white/6 px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/12 active:scale-95"
+            className="h-16 w-full rounded-3xl border border-white/10 bg-white/5 text-[11px] font-black uppercase tracking-[0.3em] text-white/60 transition hover:bg-white/10 active:scale-95"
           >
-            Simulate
+            Simulate Result
           </button>
         </div>
       </div>
@@ -736,7 +877,7 @@ function RosterRow({ player: p, isBench = false, stats, gamesPlayed = 0 }: Roste
 
       {/* Potential Stars (OOTP style) */}
       <div className="mr-2 hidden shrink-0 items-center gap-0.5 sm:flex">
-        {[...Array(5)].map((_, i) => {
+        {Array.from({ length: 5 }).map((_, i) => {
           const stars = Math.ceil(p.potential / 20);
           return (
             <svg 
@@ -992,29 +1133,42 @@ function NewsPanel({ news, isCompact = false }: { news: import("../game/types").
           ))
         )}
       </div>
-    </div>
-  );
-}
-
-function HistoryPanel({ history }: { history: import("../game/types").SeasonHistory[] }) {
+ function HistoryPanel({ history }: { history: import("../game/types").SeasonHistory[] }) {
   return (
-    <div className="rounded-[36px] border border-white/10 bg-[rgba(6,14,23,0.82)] px-6 py-7">
+    <div className="rounded-[36px] border border-white/10 bg-[rgba(6,14,23,0.82)] px-6 py-7 sm:px-8">
       <div className="text-[11px] font-semibold uppercase tracking-[0.4em] text-white/42">
-        Career History
+        Career Legacy
       </div>
-      <div className="mt-4 flex flex-col gap-2">
+      <div className="mt-6 flex flex-col gap-3">
         {history.length === 0 ? (
-          <div className="py-10 text-center text-xs text-white/20">First season in progress.</div>
+          <div className="flex flex-col items-center py-12 text-center">
+            <div className="h-1 w-12 rounded-full bg-white/5 mb-4" />
+            <div className="text-[10px] font-bold uppercase tracking-widest text-white/20">Establishing Foundation...</div>
+            <div className="mt-2 text-xs text-white/10 italic">Your first season is currently in progress.</div>
+          </div>
         ) : (
-          history.map((h, i) => (
-            <div key={i} className="flex items-center gap-4 rounded-2xl border border-white/5 bg-white/[0.02] px-5 py-4">
-              <div className="w-12 text-lg font-black text-white/20">{h.year}</div>
-              <div className="flex-1">
-                <div className="text-sm font-bold text-white/80">{h.record.wins}–{h.record.losses}</div>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">Prestige: {h.prestige}</div>
+          [...history].reverse().map((h, i) => (
+            <div key={i} className="group relative flex items-center gap-6 overflow-hidden rounded-3xl border border-white/5 bg-white/[0.01] px-6 py-5 transition hover:bg-white/[0.03]">
+              <div className="absolute left-0 top-0 h-full w-1 bg-white/5 group-hover:bg-cyan-400/40 transition-all" />
+              
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-white/20">{h.year}</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/10">Season</span>
               </div>
-              {h.postseason && (
-                <div className="rounded-full bg-cyan-400/10 border border-cyan-400/20 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-cyan-400">
+
+              <div className="flex-1">
+                <div className="text-sm font-bold text-white/80">{h.teamName}</div>
+                <div className="mt-1 flex items-center gap-3">
+                   <div className="text-xs font-mono font-bold text-cyan-400/70">{h.wins}W - {h.losses}L</div>
+                   <div className="h-1 w-1 rounded-full bg-white/10" />
+                   <div className="text-[10px] font-bold uppercase tracking-widest text-white/30">
+                     {((h.wins / (h.wins + h.losses || 1)) * 100).toFixed(1)}% Win rate
+                   </div>
+                </div>
+              </div>
+
+              {h.postseason && h.postseason !== "none" && (
+                <div className="rounded-xl bg-cyan-400/5 border border-cyan-400/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-400/80 shadow-[0_0_20px_rgba(34,211,238,0.05)]">
                   {h.postseason}
                 </div>
               )}
@@ -1022,6 +1176,10 @@ function HistoryPanel({ history }: { history: import("../game/types").SeasonHist
           ))
         )}
       </div>
+    </div>
+  );
+}
+>
     </div>
   );
 }
@@ -1034,5 +1192,191 @@ function SeasonBackgroundLayers() {
       <div className="absolute left-[8%] top-1/2 h-px w-[84%] bg-white/4" />
       <div className="absolute bottom-[-10%] left-1/2 h-[30vw] w-[30vw] min-h-[200px] min-w-[200px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.1),transparent_62%)] blur-3xl" />
     </>
+  );
+}
+
+function CoachProfilePanel({ coach, onUpgrade }: { coach: Coach; onUpgrade: (s: any) => void; onUpgradeTrait: (t: any) => void }) {
+  const stats = [
+    { key: "offense", label: "Offensive System", value: coach.offense, color: "text-amber-400" },
+    { key: "defense", label: "Defensive System", value: coach.defense, color: "text-blue-400" },
+    { key: "recruiting", label: "Recruiting Quality", value: coach.recruiting, color: "text-cyan-400" },
+    { key: "development", label: "Player Development", value: coach.development, color: "text-emerald-400" },
+  ] as const;
+
+  const xpNeeded = coach.level * 120 + 80;
+  const xpPct = (coach.experience / xpNeeded) * 100;
+
+  return (
+    <div className="glass-thick relative overflow-hidden rounded-[40px] p-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.05),transparent_50%)]" />
+      
+      <div className="relative flex flex-col gap-10 lg:flex-row lg:items-center">
+        <div className="flex flex-1 flex-col gap-6">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.5em] text-amber-400">Master Coach</div>
+            <h2 className="mt-2 text-5xl font-black tracking-tight text-white">{coach.firstName} {coach.lastName}</h2>
+            <div className="mt-4 flex items-center gap-4">
+              <span className="text-sm font-bold text-white/40">Level {coach.level}</span>
+              <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/5">
+                <div className="h-full bg-amber-400 transition-all duration-1000" style={{ width: `${xpPct}%` }} />
+              </div>
+              <span className="text-[10px] font-black text-amber-400/60">{coach.experience} / {xpNeeded} XP</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-8 border-t border-white/5 pt-6">
+             <div className="flex flex-col">
+              <span className="text-2xl font-black text-white">{coach.careerWins}-{coach.careerLosses}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Career Record</span>
+             </div>
+             <div className="flex flex-col">
+              <span className="text-2xl font-black text-cyan-400">{coach.skillPoints}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Skill Points</span>
+             </div>
+             <div className="flex flex-col">
+              <span className="text-2xl font-black text-emerald-400">{coach.traitPoints}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Trait Points</span>
+             </div>
+          </div>
+        </div>
+
+        <div className="grid flex-1 gap-4 sm:grid-cols-2">
+          {stats.map((s) => (
+            <div key={s.key} className="group relative rounded-[28px] border border-white/5 bg-white/[0.02] p-5 transition hover:border-white/10 hover:bg-white/[0.04]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">{s.label}</span>
+                <span className={`text-lg font-black ${s.color}`}>{s.value}</span>
+              </div>
+              <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/5">
+                <div className={`h-full opacity-50 ${s.color.replace('text-', 'bg-')}`} style={{ width: `${s.value}%` }} />
+              </div>
+              {coach.skillPoints > 0 && (
+                <button 
+                  onClick={() => onUpgrade(s.key)}
+                  className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-lg bg-white/5 text-white/20 transition hover:bg-white/10 hover:text-white"
+                >
+                  <span className="text-lg">+</span>
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CareerHistoryPanel({ history, currentTeam, currentRecord }: { history: any[]; currentTeam: string; currentRecord: any }) {
+  return (
+    <div className="glass-medium relative flex flex-col rounded-[32px] p-7">
+      <div className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Career Legacy</div>
+      <h3 className="mt-2 text-xl font-black text-white">Coaching History</h3>
+      
+      <div className="mt-6 space-y-4">
+        {/* Current Entry */}
+        <div className="flex items-center justify-between rounded-2xl bg-white/5 p-4 border border-white/5">
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-white">{currentTeam}</span>
+            <span className="text-[10px] font-medium text-white/30">Current Program</span>
+          </div>
+          <div className="text-right">
+            <div className="text-sm font-black text-white">{currentRecord.wins}-{currentRecord.losses}</div>
+            <div className="text-[10px] font-bold text-emerald-400">ACTIVE</div>
+          </div>
+        </div>
+
+        {/* Past History */}
+        {history.length === 0 ? (
+          <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/20">
+            First Job in Career
+          </div>
+        ) : (
+          [...history].reverse().map((h, i) => (
+            <div key={i} className="flex items-center justify-between p-4 border-b border-white/5 last:border-0">
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-white/80">{h.teamName}</span>
+                <span className="text-[10px] font-medium text-white/20">{h.year} Season</span>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-bold text-white/60">{h.wins}-{h.losses}</div>
+                <div className="text-[10px] font-medium text-white/20">Final</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CoachTraitsPanel({ coach, onUpgrade }: { coach: import("../game/types").Coach; onUpgrade: (t: import("../game/types").CoachTrait) => void }) {
+  const ALL_TRAITS: import("../game/types").CoachTrait[] = [
+    "Big Man Whisperer", "NIL Guru", "Defensive Specialist", 
+    "Recruiting Magnet", "Transfer King", "Tactical Genius", "Player Developer"
+  ];
+
+  const traitDetails: Record<import("../game/types").CoachTrait, { desc: string; icon: string }> = {
+    "Big Man Whisperer": { desc: "+5 Rebounding to all Centers", icon: "⚒" },
+    "NIL Guru": { desc: "+$5k NIL budget every week", icon: "💰" },
+    "Defensive Specialist": { desc: "Permanent +3 to Team Defense rating", icon: "🛡️" },
+    "Recruiting Magnet": { desc: "+25 Recruiting Points every week", icon: "🧲" },
+    "Transfer King": { desc: "Reduced morale penalty for transfers", icon: "✈️" },
+    "Tactical Genius": { desc: "Greater impact from Game Plan adjustments", icon: "📋" },
+    "Player Developer": { desc: "+10% Off-season development gains", icon: "📈" },
+  };
+
+  return (
+    <div className="glass-medium relative flex flex-col rounded-[32px] p-7">
+      <div className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Specializations</div>
+      <h3 className="mt-2 text-xl font-black text-white">Coaching Traits</h3>
+
+      <div className="mt-6 grid gap-3">
+        {ALL_TRAITS.map(t => {
+          const isOwned = coach.traits.includes(t);
+          const canAfford = coach.traitPoints > 0;
+          const { desc, icon } = traitDetails[t];
+
+          return (
+            <div 
+              key={t}
+              className={`group flex items-center justify-between rounded-2xl border p-4 transition-all ${
+                isOwned 
+                  ? "border-emerald-400/30 bg-emerald-400/5" 
+                  : "border-white/5 bg-white/[0.02]"
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl ${isOwned ? "bg-emerald-400/10" : "bg-white/5 opacity-40"}`}>
+                  {icon}
+                </div>
+                <div className="flex flex-col">
+                  <span className={`text-[13px] font-bold ${isOwned ? "text-emerald-400" : "text-white/70"}`}>{t}</span>
+                  <span className="text-[10px] text-white/30">{desc}</span>
+                </div>
+              </div>
+
+              {!isOwned && (
+                <button
+                  disabled={!canAfford}
+                  onClick={() => onUpgrade(t)}
+                  className={`rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition ${
+                    canAfford 
+                      ? "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white" 
+                      : "bg-white/5 text-white/10"
+                  }`}
+                >
+                  {canAfford ? "Unlock" : "Locked"}
+                </button>
+              )}
+              {isOwned && (
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400 text-[10px] text-slate-950 font-black">
+                  ✓
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

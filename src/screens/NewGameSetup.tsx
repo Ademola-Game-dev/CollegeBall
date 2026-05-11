@@ -25,6 +25,7 @@ export default function NewGameSetup() {
   const [development, setDevelopment] = useState(50);
 
   // Team Selection
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedTeamId, setSelectedTeamId] = useState(AVAILABLE_TEAMS[0].id);
 
   const handleStart = () => {
@@ -42,8 +43,11 @@ export default function NewGameSetup() {
       level: 1,
       experience: 0,
       skillPoints: 0,
+      traitPoints: 1, // Start with 1 trait point for early customization
+      traits: [],
       careerWins: 0,
       careerLosses: 0,
+      history: [],
     };
 
     startSeason(fullTeam, coach);
@@ -76,9 +80,22 @@ export default function NewGameSetup() {
 
             {/* Program Selection */}
             <div>
-              <h2 className="text-xs font-bold uppercase tracking-[0.25em] text-white/40">2. Select Program</h2>
-              <div className="mt-6 grid gap-3">
-                {AVAILABLE_TEAMS.map((t) => (
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-xs font-bold uppercase tracking-[0.25em] text-white/40">2. Select Program</h2>
+                <input 
+                  type="text"
+                  placeholder="Search programs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full sm:w-64 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-cyan-400/50 focus:outline-none"
+                />
+              </div>
+              
+              <div className="mt-6 grid h-[400px] gap-3 overflow-y-auto pr-2 scrollbar-hide">
+                {AVAILABLE_TEAMS
+                  .filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.region.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .slice(0, 50) // Limit to 50 for performance
+                  .map((t) => (
                   <TeamCard 
                     key={t.id} 
                     team={t} 
@@ -86,6 +103,11 @@ export default function NewGameSetup() {
                     onSelect={() => setSelectedTeamId(t.id)} 
                   />
                 ))}
+                {AVAILABLE_TEAMS.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).length > 50 && (
+                   <div className="py-4 text-center text-[10px] font-bold uppercase tracking-widest text-white/20">
+                     Keep typing to narrow down {AVAILABLE_TEAMS.length} teams...
+                   </div>
+                )}
               </div>
             </div>
           </section>
@@ -131,6 +153,9 @@ function InputGroup({ label, value, onChange }: { label: string; value: string; 
       <label className="text-[10px] font-bold uppercase tracking-wider text-white/40">{label}</label>
       <input
         type="text"
+        id={`input-${label.toLowerCase().replace(/\s+/g, '-')}`}
+        title={label}
+        placeholder={`Enter ${label}...`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="rounded-xl border border-white/8 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/10 focus:border-cyan-400/50 focus:outline-none focus:ring-1 focus:ring-cyan-400/50"
@@ -150,7 +175,7 @@ function TeamCard({ team: t, selected, onSelect }: { team: any; selected: boolea
       }`}
     >
       <div 
-        className="h-10 w-10 rounded-full shadow-inner" 
+        className="h-10 w-10 rounded-full shadow-inner border border-white/10" 
         style={{ background: `linear-gradient(135deg, ${t.primaryColor}, ${t.secondaryColor})` }} 
       />
       <div className="flex flex-col items-start">
@@ -179,6 +204,7 @@ function RatingSlider({ label, value, onChange, color }: { label: string; value:
         type="range"
         min="30"
         max="70"
+        title={label}
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value))}
         className="h-1 w-full cursor-pointer appearance-none rounded-lg bg-white/10 accent-cyan-400"

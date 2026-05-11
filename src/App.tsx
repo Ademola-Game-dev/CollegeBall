@@ -9,6 +9,8 @@ import GameScreen from "./screens/GameScreen";
 import SeasonHub from "./screens/SeasonHub";
 import RecruitingScreen from "./screens/RecruitingScreen";
 import NewGameSetup from "./screens/NewGameSetup";
+import JobOffersScreen from "./screens/JobOffersScreen";
+import TournamentScreen from "./screens/TournamentScreen";
 
 export default function App() {
   const screen = useGameStore((s) => s.screen);
@@ -24,6 +26,10 @@ export default function App() {
       return <SeasonHub />;
     case "recruiting":
       return <RecruitingScreen />;
+    case "jobOffers":
+      return <JobOffersScreen />;
+    case "tournaments":
+      return <TournamentScreen />;
     default:
       return <MainMenu />;
   }

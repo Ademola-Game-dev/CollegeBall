@@ -1,14 +1,11 @@
 /**
- * RecruitingScreen – off-season recruiting hub.
- *
- * Ported concept from CFHC's RecruitingActivity / RecruitingView:
- *  - Browse a pool of incoming-class prospects
- *  - Spend scouting points to reveal a prospect's true rating
- *  - Offer scholarships (commit based on program prestige / interest)
- *  - Finish recruiting to lock in the class and start the next season
- *
- * The recruiting pool, scouting budget, and interest levels are all generated
- * by `generateProspects()` in defaults.ts using the CFHC recruiting model.
+ * RecruitingScreen – high-fidelity off-season recruiting hub.
+ * 
+ * Features:
+ * - AAA-style scouting dashboard
+ * - Card-based prospect browsing with star ratings
+ * - Tactical interaction system (Scout, Contact, NIL, Offer)
+ * - Real-time class signing feedback
  */
 
 import { useState } from "react";
@@ -25,7 +22,6 @@ type RegionFilter = (typeof REGION_ORDER)[number];
 export default function RecruitingScreen() {
   const season         = useGameStore((s) => s.season);
   const prospects      = useGameStore((s) => s.prospects);
-  const scoutingPoints = useGameStore((s) => s.scoutingPoints);
   const scoutProspect  = useGameStore((s) => s.scoutProspect);
   const contactProspect = useGameStore((s) => s.contactProspect);
   const offerNil       = useGameStore((s) => s.offerNil);
@@ -41,7 +37,6 @@ export default function RecruitingScreen() {
   const graduatingSeniors = season.team.roster.filter((p) => p.year === 4);
   const openSpots = Math.max(0, graduatingSeniors.length);
   const committed = prospects.filter((p) => p.committed);
-  const offered   = prospects.filter((p) => p.offered && !p.committed);
 
   const filtered = prospects.filter((p) => {
     if (posFilter !== "All" && p.position !== posFilter) return false;
@@ -54,171 +49,95 @@ export default function RecruitingScreen() {
   });
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07111b] pb-[max(1rem,env(safe-area-inset-bottom,0px))] text-white">
+    <div className="relative min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#07111b] pb-20 text-white">
       <RecruitingBg />
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1200px] flex-col px-5 py-5 sm:px-8 sm:py-7">
         {/* Header */}
-        <header className="flex items-start justify-between gap-4 border-b border-white/8 pb-5">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.45em] text-emerald-200/70">
-              Off-Season · Recruiting
+        <header className="relative flex flex-col gap-6 border-b border-white/5 pb-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-3">
+                <span className="rounded-full bg-emerald-400 px-3 py-0.5 text-[10px] font-black uppercase tracking-widest text-slate-950">
+                  Off-Season
+                </span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.4em] text-white/30">
+                  Target Selection Cycle
+                </span>
+              </div>
+              <h1 className="mt-2 text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">
+                Scouting Hub
+              </h1>
+              <div className="mt-1 flex items-center gap-2 text-sm font-medium text-white/40">
+                <span>{season.team.name}</span>
+                <span className="h-1 w-1 rounded-full bg-white/20" />
+                <span className="text-emerald-400/80">Signing Window Open</span>
+              </div>
             </div>
-            <h1 className="mt-2 text-4xl font-black uppercase leading-none tracking-[0.04em] text-white sm:text-5xl">
-              Recruiting
-            </h1>
-            <p className="mt-2 text-sm text-white/50">
-              {season.team.name} · {season.year} Recruiting Class
-            </p>
           </div>
-          <button
-            onClick={finishRecruiting}
-            className="mt-1 shrink-0 rounded-[22px] bg-emerald-400 px-6 py-3 text-sm font-black uppercase tracking-[0.2em] text-slate-950 transition hover:bg-emerald-300 active:scale-95"
-          >
-            Sign Class
-          </button>
+
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-end px-4 border-r border-white/10">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">Target Goal</span>
+              <span className="text-xl font-black text-white">{committed.length} / {openSpots} Signed</span>
+            </div>
+            <button
+              onClick={finishRecruiting}
+              className="group relative flex h-14 items-center justify-center overflow-hidden rounded-2xl bg-emerald-400 px-8 text-slate-950 transition-all hover:bg-emerald-300 active:scale-95 glow-cyan"
+            >
+              <span className="relative z-10 text-sm font-black uppercase tracking-[0.2em]">Sign Class</span>
+            </button>
+          </div>
         </header>
 
-        <main className="flex flex-1 flex-col gap-5 py-5">
-          {/* Summary cards */}
+        <main className="mt-10 flex flex-1 flex-col gap-8">
+          {/* Summary stats */}
           <div className="grid gap-4 sm:grid-cols-4">
-            <SummaryCard
-              label="Recruiting Points"
-              value={season.recruitingPoints}
-              color="cyan"
-              note="Spend on scouting and contact"
-            />
-            <SummaryCard
-              label="NIL Budget"
-              value={`$${(season.nilBudget / 1000).toFixed(1)}k`}
-              color="amber"
-              note="Fund NIL deals for top prospects"
-            />
-            <SummaryCard
-              label="Open Spots"
-              value={openSpots}
-              color="cyan"
-              note={`${graduatingSeniors.length} graduating seniors`}
-            />
-            <SummaryCard
-              label="Committed"
-              value={committed.length}
-              color="emerald"
-              note={`${offered.length} scholarship offers pending`}
-            />
+            <SummaryCard label="Weekly Pts" value={season.recruitingPoints} icon={<PointIcon />} />
+            <SummaryCard label="NIL Fund" value={`$${(season.nilBudget / 1000).toFixed(1)}k`} icon={<NILIcon />} />
+            <SummaryCard label="Open Spots" value={openSpots} icon={<SpotIcon />} />
+            <SummaryCard label="Committed" value={committed.length} icon={<CheckIcon />} />
           </div>
 
-          {/* Graduating seniors callout */}
-          {graduatingSeniors.length > 0 && (
-            <div className="rounded-[28px] border border-amber-200/15 bg-amber-300/5 px-6 py-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.38em] text-amber-200/70">
-                Graduating Seniors
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {graduatingSeniors.map((p) => (
-                  <span
-                    key={p.id}
-                    className="rounded-full border border-amber-200/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100/80"
-                  >
-                    {p.firstName[0]}. {p.lastName} · {p.position}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Committed class */}
-          {committed.length > 0 && (
-            <div className="rounded-[28px] border border-emerald-400/15 bg-emerald-400/5 px-6 py-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.38em] text-emerald-200/70">
-                Incoming Class ({committed.length})
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {committed.map((p) => (
-                  <span
-                    key={p.id}
-                    className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-100/80"
-                  >
-                    {p.firstName[0]}. {p.lastName} · {p.position} ·{" "}
-                    {p.scouted ? p.rating : prospectGrade(p.rating)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Filters + sort */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Position filter */}
-            <div className="flex gap-1">
+          {/* Filters */}
+          <div className="glass-thin flex flex-wrap items-center gap-4 rounded-[32px] p-4">
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide">
               {POSITION_ORDER.map((pos) => (
                 <button
                   key={pos}
                   onClick={() => setPosFilter(pos)}
-                  className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] transition ${
-                    posFilter === pos
-                      ? "bg-cyan-400 text-slate-950"
-                      : "border border-white/12 bg-white/5 text-white/55 hover:bg-white/10"
+                  className={`shrink-0 rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                    posFilter === pos ? "bg-white text-slate-950" : "text-white/40 hover:bg-white/5"
                   }`}
                 >
                   {pos}
                 </button>
               ))}
             </div>
-
-            {/* Region filter */}
-            <select
-              value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value as RegionFilter)}
-              title="Filter by Region"
-              aria-label="Filter prospects by region"
-              className="rounded-full border border-white/12 bg-white/5 px-3 py-1 text-[11px] text-white/70 focus:outline-none"
-            >
-              {REGION_ORDER.map((r) => (
-                <option key={r} value={r} className="bg-[#0d1f2d]">{r}</option>
-              ))}
-            </select>
-
-            {/* Sort */}
+            <div className="h-6 w-px bg-white/10 hidden lg:block" />
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              title="Sort Prospects"
-              aria-label="Sort prospects list"
-              className="rounded-full border border-white/12 bg-white/5 px-3 py-1 text-[11px] text-white/70 focus:outline-none"
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="rounded-xl bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white/60 focus:outline-none"
             >
-              <option value="rating" className="bg-[#0d1f2d]">Sort: Rating</option>
-              <option value="interest" className="bg-[#0d1f2d]">Sort: Interest</option>
-              <option value="position" className="bg-[#0d1f2d]">Sort: Position</option>
+              <option value="rating">Sort: Talent</option>
+              <option value="interest">Sort: Interest</option>
+              <option value="position">Sort: Position</option>
             </select>
-
-            <div className="ml-auto text-[11px] text-white/35">
-              {filtered.length} prospects
-            </div>
           </div>
 
-          {/* Prospect list */}
-          <div className="flex flex-col gap-2">
-            {filtered.length === 0 ? (
-              <div className="rounded-[28px] border border-white/8 px-6 py-10 text-center text-sm text-white/40">
-                No prospects match your filters.
-              </div>
-            ) : (
-              filtered.map((p) => (
-                <ProspectRow
-                  key={p.id}
-                  prospect={p}
-                  canScout={season.recruitingPoints >= 10 && !p.scouted}
-                  canContact={season.recruitingPoints >= 5 && !p.committed}
-                  onScout={() => scoutProspect(p.id)}
-                  onContact={() => contactProspect(p.id)}
-                  onOfferNil={(amt) => offerNil(p.id, amt)}
-                  onOffer={() => offerProspect(p.id)}
-                  userRegion={season.team.region}
-                  nilBudget={season.nilBudget}
-                />
-              ))
-            )}
+          {/* List */}
+          <div className="flex flex-col gap-3">
+            {filtered.map((p) => (
+              <ProspectRow
+                key={p.id}
+                p={p}
+                scout={() => scoutProspect(p.id)}
+                contact={() => contactProspect(p.id)}
+                offerNil={(amt) => offerNil(p.id, amt)}
+                offer={() => offerProspect(p.id)}
+              />
+            ))}
           </div>
         </main>
       </div>
@@ -226,210 +145,124 @@ export default function RecruitingScreen() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-interface SummaryCardProps {
-  label: string;
-  value: number;
-  color: "cyan" | "amber" | "emerald";
-  note: string;
-}
-
-function SummaryCard({ label, value, color, note }: { label: string; value: string | number; color: string; note: string }) {
-  const borderCls = color === "cyan"    ? "border-cyan-300/15"   :
-                    color === "amber"   ? "border-amber-300/15"  :
-                                          "border-emerald-400/15";
-  const bgCls     = color === "cyan"    ? "bg-cyan-400/5"        :
-                    color === "amber"   ? "bg-amber-400/5"       :
-                                          "bg-emerald-400/5";
-  const textCls   = color === "cyan"    ? "text-cyan-300"        :
-                    color === "amber"   ? "text-amber-300"       :
-                                          "text-emerald-300";
-
+function ProspectRow({ p, scout, contact, offerNil, offer }: { p: Prospect, scout: () => void, contact: () => void, offerNil: (amt: number) => void, offer: () => void }) {
+  const starCount = Math.max(1, Math.min(5, Math.floor((p.rating - 55) / 7)));
+  
   return (
-    <div className={`rounded-[28px] border ${borderCls} ${bgCls} px-6 py-5`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.38em] text-white/45">
-        {label}
-      </div>
-      <div className={`mt-2 text-4xl font-black ${textCls}`}>{value}</div>
-      <div className="mt-1 text-[11px] text-white/35">{note}</div>
-    </div>
-  );
-}
-
-interface ProspectRowProps {
-  prospect: Prospect;
-  canScout: boolean;
-  canContact: boolean;
-  onScout: () => void;
-  onContact: () => void;
-  onOfferNil: (amt: number) => void;
-  onOffer: () => void;
-  userRegion?: string;
-  nilBudget: number;
-}
-
-function ProspectRow({ 
-  prospect: p, 
-  canScout, 
-  onScout, 
-  onOffer,
-  userRegion
-}: ProspectRowProps) {
-  const ratingDisplay = p.scouted ? String(p.rating) : prospectGrade(p.rating);
-  const interestPct   = Math.round(p.interestLevel * 100);
-
-  const interestColor =
-    p.interestLevel >= 0.70 ? "text-emerald-400" :
-    p.interestLevel >= 0.45 ? "text-amber-300" :
-    "text-red-400";
-
-  const statusBadge = p.committed
-    ? { label: "Committed", cls: "border-emerald-400/30 bg-emerald-400/15 text-emerald-200" }
-    : p.offered
-    ? { label: "Offered", cls: "border-amber-300/30 bg-amber-300/10 text-amber-200" }
-    : null;
-
-  return (
-    <div
-      className={`flex flex-col gap-3 rounded-[24px] border px-5 py-4 sm:flex-row sm:items-center ${
-        p.committed
-          ? "border-emerald-400/20 bg-emerald-400/5"
-          : p.offered
-          ? "border-amber-200/18 bg-amber-300/4"
-          : "border-white/8 bg-white/[0.025]"
-      }`}
-    >
-      {/* Position badge */}
-      <div className="flex shrink-0 items-center gap-3 sm:w-12">
-        <div className="w-10 rounded-lg border border-white/12 bg-white/8 py-1 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">
-          {p.position}
-        </div>
-      </div>
-
-      {/* Name + region */}
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col">
-            <div className="text-sm font-bold text-white">
-              {p.firstName} {p.lastName}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] font-medium uppercase tracking-widest text-white/30">{p.archetype}</span>
-              {p.scouted && p.traits.map(t => (
-                <span key={t} className="rounded-sm bg-amber-400/10 px-1 text-[8px] font-bold uppercase tracking-wider text-amber-400/60 ring-1 ring-inset ring-amber-400/20">{t}</span>
-              ))}
+    <div className={`group relative overflow-hidden rounded-[32px] border p-5 transition-all active:scale-[0.99] ${p.committed ? 'border-emerald-400/30 bg-emerald-400/5 shadow-[0_0_20px_rgba(52,211,153,0.1)]' : 'border-white/5 bg-slate-950/40 hover:border-white/15 hover:bg-slate-900/60'}`}>
+      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
+        {/* Info */}
+        <div className="flex min-w-[260px] items-center gap-5">
+          <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-xl font-black transition-all ${p.committed ? 'bg-emerald-400/10 text-emerald-400' : 'bg-white/5 text-white/20'}`}>
+            {p.position}
+          </div>
+          <div>
+            <h3 className="text-xl font-black tracking-tight text-white group-hover:text-cyan-400 transition-colors">{p.firstName} {p.lastName}</h3>
+            <div className="mt-1 flex items-center gap-2">
+              <StarRating count={starCount} />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">{p.region} · {p.scouted ? p.rating : prospectGrade(p.rating)}</span>
             </div>
           </div>
-          {userRegion === p.region && (
-            <span className="rounded border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400/80">
-              Regional Bonus
+        </div>
+
+        {/* Progress Bars */}
+        <div className="flex flex-1 items-center gap-8 px-4 lg:border-x lg:border-white/5">
+          <div className="flex-1 space-y-2">
+            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-white/20">
+              <span>Talent Potential</span>
+              <span className="text-cyan-400/80 font-mono">{p.potentialRange[0]}–{p.potentialRange[1]}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+              <div 
+                className={`h-full transition-all duration-700 ease-out ${p.committed ? 'bg-emerald-400' : 'bg-cyan-400/60'}`} 
+                style={{ width: `${(p.rating - 50) * 2}%` }} 
+              />
+            </div>
+          </div>
+          <div className="flex flex-col items-center min-w-[80px]">
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Interest</span>
+            <span className={`text-lg font-black transition-colors ${p.interestLevel > 0.8 ? 'text-emerald-400' : 'text-white'}`}>
+              {Math.round(p.interestLevel * 100)}%
             </span>
-          )}
+          </div>
         </div>
-        <div className="mt-0.5 text-[11px] text-white/40">{p.region} Region</div>
-      </div>
 
-      {/* Rating display */}
-      <div className="flex shrink-0 flex-col items-center">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/35">
-          Rating
-        </div>
-        <div className={`mt-0.5 text-xl font-black ${p.scouted ? "text-white" : "text-white/55"}`}>
-          {ratingDisplay}
-        </div>
-        {!p.scouted && (
-          <div className="text-[9px] text-white/25">Unverified</div>
-        )}
-      </div>
-
-      {/* Interest level */}
-      <div className="flex shrink-0 flex-col items-center px-2">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/35">
-          Interest
-        </div>
-        <div className={`mt-0.5 text-xl font-black ${interestColor}`}>
-          {interestPct}%
-        </div>
-      </div>
-
-      {/* Potential Range (OOTP style) */}
-      <div className="flex shrink-0 flex-col items-center px-2">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/35">
-          Potential
-        </div>
-        <div className={`mt-0.5 text-lg font-black ${p.scouted ? "text-amber-300" : "text-white/35"}`}>
-          {p.potentialRange[0]}–{p.potentialRange[1]}
-        </div>
-      </div>
-
-      {/* Status / Actions */}
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:max-w-[280px]">
-        {statusBadge ? (
-          <span className={`rounded-full border px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] ${statusBadge.cls}`}>
-            {statusBadge.label}
-          </span>
-        ) : (
-          <>
-            {!p.scouted && (
+        {/* Actions */}
+        <div className="flex items-center gap-2 lg:min-w-[340px] lg:justify-end">
+          {p.committed ? (
+            <div className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-400/10 border border-emerald-400/20 text-emerald-400 animate-pulse">
+               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+               <span className="text-[10px] font-black uppercase tracking-widest">Signed & Committed</span>
+            </div>
+          ) : (
+            <>
+              {!p.scouted && <ActionBtn onClick={scout} label="Scout" color="cyan" icon="radar" />}
+              <ActionBtn onClick={contact} label="Contact" color="cyan" icon="phone" />
+              <ActionBtn onClick={() => offerNil(5000)} label="+$5k NIL" color="amber" icon="money" />
               <button
-                onClick={onScout}
-                disabled={!canScout}
-                title="Costs 10 Recruiting Points"
-                className={`rounded-full border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition ${
-                  canScout
-                    ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200 hover:bg-cyan-300/20 active:scale-95"
-                    : "cursor-not-allowed border-white/5 bg-white/2 text-white/15"
+                onClick={offer}
+                disabled={p.offered}
+                className={`h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg ${
+                  p.offered ? "bg-white/5 text-white/20 border border-white/5" : "bg-white text-slate-950 hover:bg-cyan-400 hover:shadow-cyan-500/20 active:scale-95"
                 }`}
               >
-                Scout
+                {p.offered ? "Offered" : "Offer Scholarship"}
               </button>
-            )}
-            
-            <button
-              onClick={onContact}
-              disabled={!canContact}
-              title="Costs 5 Recruiting Points"
-              className={`rounded-full border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition ${
-                canContact
-                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20 active:scale-95"
-                  : "cursor-not-allowed border-white/5 bg-white/2 text-white/15"
-              }`}
-            >
-              Contact
-            </button>
-
-            {p.scouted && nilBudget >= 5000 && (
-              <button
-                onClick={() => onOfferNil(5000)}
-                className="rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-amber-200 transition hover:bg-amber-400/20 active:scale-95"
-              >
-                +$5k NIL
-              </button>
-            )}
-
-            <button
-              onClick={onOffer}
-              className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-white/20 active:scale-95"
-            >
-              Offer
-            </button>
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
+function ActionBtn({ onClick, label, color, icon }: { onClick: () => void, label: string, color: string, icon?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`h-12 flex-1 rounded-2xl border px-4 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 group/btn flex items-center justify-center gap-2 ${
+        color === "cyan" ? "border-cyan-400/20 bg-cyan-400/5 text-cyan-400 hover:bg-cyan-400 hover:text-slate-950" : "border-amber-400/20 bg-amber-400/5 text-amber-400 hover:bg-amber-400 hover:text-slate-950"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SummaryCard({ label, value, icon }: { label: string, value: string | number, icon: any }) {
+  return (
+    <div className="glass-thin rounded-[32px] p-6">
+      <div className="flex items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-white/40">{icon}</div>
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-white/30">{label}</div>
+          <div className="text-2xl font-black text-white">{value}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StarRating({ count }: { count: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <svg key={i} className={`h-3 w-3 ${i < count ? "text-amber-400" : "text-white/10"}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+      ))}
+    </div>
+  );
+}
+
+const PointIcon = () => <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>;
+const NILIcon = () => <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const SpotIcon = () => <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
+const CheckIcon = () => <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
 function RecruitingBg() {
   return (
     <>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_32%),linear-gradient(180deg,#07111b_0%,#040a12_100%)]" />
-      <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/4" />
-      <div className="absolute bottom-[-10%] left-1/2 h-[30vw] w-[30vw] min-h-[200px] min-w-[200px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.08),transparent_62%)] blur-3xl" />
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_40%),linear-gradient(180deg,#07111b_0%,#040a12_100%)]" />
+      <div className="fixed left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/5" />
     </>
   );
 }

@@ -12,6 +12,7 @@ import type {
   GameSpeed,
   SimStatus,
   Team,
+  Coach,
   ScoreState,
   GameClock,
   ShotClock,
@@ -26,6 +27,7 @@ import type {
   Season,
   SeasonGame,
   Prospect,
+  SeasonRecord,
 } from "../game/types";
 import {
   defaultHomeTeam,
@@ -38,6 +40,12 @@ import {
   developAndAdvancePlayer,
   prospectToPlayer,
   generateTop25,
+  createInitialSeason,
+  generateJobOffers,
+  setupUserTeam,
+  rand,
+  getConferenceTeams,
+  AVAILABLE_TEAMS,
 } from "../game/data/defaults";
 
 // ---------------------------------------------------------------------------
@@ -50,7 +58,7 @@ const MIN_RECRUITING_CLASS_SIZE = 3;
 const RECRUITING_POOL_BUFFER = 12;
 /** Minimum scouting points a coach with any recruiting rating will have. */
 const MIN_SCOUTING_POINTS = 3;
-/** Divisor mapping coach recruiting rating (0â€“100) â†’ scouting points. */
+/** Divisor mapping coach recruiting rating (0–100) → scouting points. */
 const RECRUITING_TO_SCOUTING_DIVISOR = 15;
 
 export interface GameStore {
@@ -93,10 +101,12 @@ export interface GameStore {
   playerStats: Record<string, PlayerGameStats>;
   /** The current phase of the match (e.g. PRE_GAME, IN_PLAY, FULL_TIME). */
   phase: MatchPhase;
-  /** Current overtime period: 0 = regulation, 1 = first OT, 2 = second OT, â€¦ */
+  /** Current overtime period: 0 = regulation, 1 = first OT, 2 = second OT, … */
   overtimePeriod: number;
   /** Raw sim events emitted on the latest tick. */
   latestEvents: SimEvent[];
+  /** Whether a background simulation task is running. */
+  isSimulating: boolean;
 
   // ---- Actions ----
   /** Initialise a new exhibition game with default data. */
@@ -146,8 +156,16 @@ export interface GameStore {
   upgradeNILCollective: () => void;
   /** Upgrade a coach rating using an available skill point. */
   upgradeCoach: (stat: "offense" | "defense" | "recruiting" | "development") => void;
+  /** Upgrade a specialized coaching trait. */
+  upgradeCoachTrait: (trait: import("../game/types").CoachTrait) => void;
+  /** Accept a new job offer and move to that program. */
+  acceptJobOffer: (offerId: string) => void;
+  /** Clear all pending job offers (staying at current school). */
+  stayAtSchool: () => void;
   /** Update the team's tactical game plan. */
   updateGamePlan: (plan: Partial<import("../game/types").GamePlan>) => void;
+  /** Advance the current tournament by one round (simulates all games). */
+  advanceTournamentRound: (tournamentId: string) => void;
 }
 
 export const useGameStore = create<GameStore>((set) => ({
@@ -239,6 +257,7 @@ export const useGameStore = create<GameStore>((set) => ({
   phase: "PRE_GAME" as MatchPhase,
   overtimePeriod: 0,
   latestEvents: [],
+  isSimulating: false,
 
   // Season / Head Coach mode initial state
   season: null,
@@ -289,7 +308,7 @@ export const useGameStore = create<GameStore>((set) => ({
     }),
 
   // Season / Head Coach mode
-  startSeason: (selectedTeam: import("../game/types").Team, coach: import("../game/types").Coach) =>
+  startSeason: (selectedTeam: Team, coach: Coach) =>
     set({ 
       season: createInitialSeason(selectedTeam, coach, defaultGameSettings), 
       screen: "season",
@@ -346,69 +365,71 @@ export const useGameStore = create<GameStore>((set) => ({
       };
     }),
 
-  simulateSeasonGame: () =>
-    set((state) => {
-      const { season } = state;
-      if (!season) return state;
-      const idx = season.currentGameIndex;
-      const game = season.schedule[idx];
-      if (!game || game.result !== null) return state;
+  simulateSeasonGame: () => {
+    set({ isSimulating: true });
+    setTimeout(() => {
+      set((state) => {
+        const { season } = state;
+        if (!season) return { ...state, isSimulating: false };
+        const idx = season.currentGameIndex;
+        const game = season.schedule[idx];
+        if (!game || game.result !== null) return { ...state, isSimulating: false };
 
-      // Quick statistical sim based on relative team quality and program prestige.
-      // Adapted from CFHC's statistical sim: prestige provides a small home-court
-      // advantage and overall quality gap determines score spread.
-      const userOverall = computeTeamOverall(season.team);
-      const prestigeBonus = game.isHome ? (season.prestige / 100) * 4 : 0;
-      const paceFactor = season.gamePlan.pace === "fast" ? 1.12 : season.gamePlan.pace === "slow" ? 0.88 : 1.0;
-      const baseline = 63;
-      const spread = 18;
-      const userScore = Math.round(
-        (baseline + (userOverall / 100) * spread + prestigeBonus + (Math.random() - 0.5) * 14) * paceFactor
-      );
-      const oppScore = Math.round(
-        (baseline + (game.opponent.overall / 100) * spread + (Math.random() - 0.5) * 14) * paceFactor
-      );
-      const result: "win" | "loss" = userScore > oppScore ? "win" : "loss";
+        const userOverall = computeTeamOverall(season.team);
+        const prestigeBonus = game.isHome ? (season.prestige / 100) * 4 : 0;
+        const paceFactor = season.gamePlan.pace === "fast" ? 1.12 : season.gamePlan.pace === "slow" ? 0.88 : 1.0;
+        const baseline = 63;
+        const spread = 18;
+        const userScore = Math.round(
+          (baseline + (userOverall / 100) * spread + prestigeBonus + (Math.random() - 0.5) * 14) * paceFactor
+        );
+        const oppScore = Math.round(
+          (baseline + (game.opponent.overall / 100) * spread + (Math.random() - 0.5) * 14) * paceFactor
+        );
+        const result: "win" | "loss" = userScore > oppScore ? "win" : "loss";
 
-      const isConfGame = game.gameType === "conf" || game.gameType === "conf-title";
+        const isConfGame = game.gameType === "conf" || game.gameType === "conf-title";
 
-      const newSchedule = season.schedule.map((g, i) =>
-        i === idx ? { ...g, result, userScore, opponentScore: oppScore } : g
-      );
+        const newSchedule = season.schedule.map((g, i) =>
+          i === idx ? { ...g, result, userScore, opponentScore: oppScore } : g
+        );
 
-      const newRecord = {
-        wins:   season.record.wins   + (result === "win"  ? 1 : 0),
-        losses: season.record.losses + (result === "loss" ? 1 : 0),
-      };
+        const newRecord = {
+          wins:   season.record.wins   + (result === "win"  ? 1 : 0),
+          losses: season.record.losses + (result === "loss" ? 1 : 0),
+        };
 
-      const newsItem: import("../game/types").NewsItem = generateGameNewsItem(
-        game, result, userScore, oppScore, newRecord, idx + 1
-      );
+        const newsItem: import("../game/types").NewsItem = generateGameNewsItem(
+          game, result, userScore, oppScore, newRecord, idx + 1
+        );
 
-      return {
-        season: {
-          ...season,
-          schedule: newSchedule,
-          record: newRecord,
-          conferenceRecord: isConfGame ? {
-            wins:   season.conferenceRecord.wins   + (result === "win"  ? 1 : 0),
-            losses: season.conferenceRecord.losses + (result === "loss" ? 1 : 0),
-          } : season.conferenceRecord,
-          currentGameIndex: idx + 1,
-          budget: season.budget + calculatePostGameRevenue(season, game, result),
-          coach: updateCoachProgression(
-            {
-              ...season.coach,
-              careerWins: season.coach.careerWins + (result === "win" ? 1 : 0),
-              careerLosses: season.coach.careerLosses + (result === "loss" ? 1 : 0),
-            },
-            calculateCoachXP(season, result, game.opponent.overall)
-          ),
-          ...calculateRankingsUpdate(season, result),
-          news: [newsItem, ...(season.news ?? [])].slice(0, 50),
-        },
-      };
-    }),
+        return {
+          isSimulating: false,
+          season: {
+            ...season,
+            schedule: newSchedule,
+            record: newRecord,
+            conferenceRecord: isConfGame ? {
+              wins:   season.conferenceRecord.wins   + (result === "win"  ? 1 : 0),
+              losses: season.conferenceRecord.losses + (result === "loss" ? 1 : 0),
+            } : season.conferenceRecord,
+            currentGameIndex: idx + 1,
+            budget: season.budget + calculatePostGameRevenue(season, game, result),
+            coach: updateCoachProgression(
+              {
+                ...season.coach,
+                careerWins: season.coach.careerWins + (result === "win" ? 1 : 0),
+                careerLosses: season.coach.careerLosses + (result === "loss" ? 1 : 0),
+              },
+              calculateCoachXP(season, result, game.opponent.overall)
+            ),
+            ...calculateRankingsUpdate(season, result),
+            news: [newsItem, ...(season.news ?? [])].slice(0, 50),
+          },
+        };
+      });
+    }, 450);
+  },
 
   returnToSeasonHub: () =>
     set((state) => {
@@ -421,18 +442,15 @@ export const useGameStore = create<GameStore>((set) => ({
         };
       }
 
-      // Record the result of the just-played game when returning from the 3D engine
       let updatedSeason = season;
       if (state.gameContext === "season" && state.simStatus === "finished") {
         const idx = season.currentGameIndex;
         const game = season.schedule[idx];
         if (game && game.result === null) {
-          // User's team is always homeTeam in playSeasonGame
           const userScore = state.score.home;
           const opponentScore = state.score.away;
           const result: "win" | "loss" = userScore >= opponentScore ? "win" : "loss";
 
-          // Merge this game's player stats into the cumulative season stats
           const prevSeasonStats = season.seasonStats ?? {};
           const mergedStats: Record<string, import("../game/types").PlayerGameStats> = { ...prevSeasonStats };
           for (const [playerId, stats] of Object.entries(state.playerStats)) {
@@ -519,110 +537,26 @@ export const useGameStore = create<GameStore>((set) => ({
       };
     }),
 
-  /**
-   * Advance to the next season:
-   *  1. Graduate all seniors (year = 4) from the roster.
-   *  2. Apply development gains to all returning players (year 1â€“3) using the
-   *     coach's development rating â€” mirrors CFHC's `advanceSeason` logic.
-   *  3. Adjust program prestige based on win %.
-   *  4. Generate a fresh incoming-class prospect pool sized to fill open spots.
-   *  5. Navigate to the recruiting screen.
-   */
   advanceSeason: () =>
     set((state) => {
       const { season } = state;
       if (!season) return state;
 
-      const { coach, team, record } = season;
-      const totalGames = record.wins + record.losses;
-      const winPct = totalGames > 0 ? record.wins / totalGames : 0;
-
-      // 1 & 2: Develop and advance players; seniors return null (graduated)
-      // Also handle transfers: players with low morale are likely to leave (OOTP style)
-      const returnees = team.roster
-        .map((p) => developAndAdvancePlayer(p, coach.development))
-        .filter((p): p is NonNullable<typeof p> => p !== null);
-
-      const afterTransfers = returnees.filter((p) => {
-        const leaveChance = (100 - p.morale) / 250; // max ~25% chance to leave if morale is 35
-        return Math.random() > leaveChance;
-      });
-
-      const graduatedCount = team.roster.length - returnees.length;
-      const transferCount = returnees.length - afterTransfers.length;
-      const openSpots = Math.max(graduatedCount + transferCount, MIN_RECRUITING_CLASS_SIZE);
-
-      // 3: Update prestige â€” wins above .500 raise it, losses lower it
-      const prestigeDelta = Math.round((winPct - 0.5) * 12);
-      const newPrestige = Math.max(30, Math.min(99, season.prestige + prestigeDelta));
-
-      // 4: Generate prospects. Scouting points scale with coach's recruiting rating.
-      const prospectCount = openSpots + RECRUITING_POOL_BUFFER;
-      const newProspects = generateProspects(newPrestige, coach.recruiting, team.region, prospectCount);
-      const scoutingPoints = Math.max(MIN_SCOUTING_POINTS, Math.round(coach.recruiting / RECRUITING_TO_SCOUTING_DIVISOR));
-
-      // Update lineup to only include returnees (trim if needed)
-      const returneeIds = new Set(afterTransfers.map((p) => p.id));
-      const newLineup = team.lineup
-        .filter((id) => returneeIds.has(id))
-        .slice(0, 5) as import("../game/types").Lineup;
-
-      const updatedTeam = { ...team, roster: afterTransfers, lineup: newLineup };
-
-      
-      const postseasonStatus = (season.rank && season.rank <= 25) ? "The Tournament" : 
-                               (winPct >= 0.55) ? "NIT Invitation" : "Home for March";
-
-      const historyEntry: import("../game/types").SeasonHistory = {
-        year: season.year,
-        record: { ...season.record },
-        prestige: season.prestige,
-        recruitingRank: season.recruitingClassRank,
-        postseason: postseasonStatus, // Need to add this to SeasonHistory too
-      };
-
-      // 5: Generate off-season news (transfers, graduations)
-      const offSeasonNews: import("../game/types").NewsItem[] = [];
-      if (graduatedCount > 0) {
-        offSeasonNews.push({
-          id: `news_grad_${season.year}_${Date.now()}`,
-          week: 0,
-          category: "recruiting",
-          headline: `Senior Class Graduating`,
-          detail: `${graduatedCount} player${graduatedCount !== 1 ? 's' : ''} have finished their eligibility and are moving on from the program.`,
-          tone: "neutral",
-        });
-      }
-      if (transferCount > 0) {
-        offSeasonNews.push({
-          id: `news_trans_${season.year}_${Date.now()}`,
-          week: 0,
-          category: "recruiting",
-          headline: `Transfer Portal Impact`,
-          detail: `${transferCount} player${transferCount !== 1 ? 's' : ''} have entered the transfer portal seeking new opportunities.`,
-          tone: "negative",
-        });
-      }
+      const offers = generateJobOffers(season.coach, season.team.id);
+      const initialProspects = generateProspects(20, season.prestige);
 
       return {
+        screen: offers.length > 0 ? "jobOffers" : "recruiting",
         season: {
           ...season,
-          team: updatedTeam,
-          year: season.year + 1,
-          prestige: newPrestige,
-          recruitingClassRating: 0,
-          recruitingClassRank: null,
-          history: [...season.history, historyEntry],
-          postseasonStatus: null,
-          news: [...offSeasonNews, ...(season.news ?? [])].slice(0, 50),
+          jobOffers: offers,
+          postseasonStatus: "none",
         },
-        prospects: newProspects,
-        scoutingPoints,
-        screen: "recruiting" as Screen,
+        prospects: initialProspects,
+        scoutingPoints: 10,
       };
     }),
 
-  // ---- Recruiting actions ----
 
   scoutProspect: (prospectId: string) =>
     set((state) => {
@@ -630,7 +564,6 @@ export const useGameStore = create<GameStore>((set) => ({
       return {
         prospects: state.prospects.map((p) => {
           if (p.id === prospectId) {
-            // Reveal archetype and narrow potential range
             const center = (p.potentialRange[0] + p.potentialRange[1]) / 2;
             const narrowRange: [number, number] = [
               Math.max(0, Math.round(center - 2)),
@@ -657,28 +590,32 @@ export const useGameStore = create<GameStore>((set) => ({
 
   contactProspect: (prospectId: string) =>
     set((state) => {
-      if (!state.season || state.season.recruitingPoints < 5) return state;
+      const { season, scoutingPoints } = state;
+      if (!season || scoutingPoints < 1) return state;
+
+      const coachSkillBonus = season.coach.recruiting / 100; 
+      const traitBonus = season.coach.traits.includes("Recruiting Magnet") ? 0.03 : 0;
+      const baseBoost = 0.08 + (coachSkillBonus * 0.05) + traitBonus;
+
       return {
-        prospects: state.prospects.map((p) => {
-          if (p.id === prospectId) {
-            return { ...p, interestLevel: Math.min(0.99, p.interestLevel + 0.04) };
-          }
-          return p;
-        }),
-        season: {
-          ...state.season,
-          recruitingPoints: state.season.recruitingPoints - 5,
-        },
+        scoutingPoints: scoutingPoints - 1,
+        prospects: state.prospects.map((p) =>
+          p.id === prospectId 
+            ? { ...p, interestLevel: Math.min(0.99, p.interestLevel + baseBoost) } 
+            : p
+        ),
       };
     }),
 
   offerNil: (prospectId: string, amount: number) =>
     set((state) => {
       if (!state.season || state.season.nilBudget < amount) return state;
+      
       return {
         prospects: state.prospects.map((p) => {
           if (p.id === prospectId) {
-            const interestBoost = amount / 250000; // $10k = ~4% boost
+            const ratingFactor = Math.max(1, (p.rating - 60) / 10); 
+            const interestBoost = amount / (150000 * ratingFactor); 
             return { 
               ...p, 
               nilOffer: p.nilOffer + amount, 
@@ -699,7 +636,6 @@ export const useGameStore = create<GameStore>((set) => ({
       const prospect = state.prospects.find((p) => p.id === prospectId);
       if (!prospect || prospect.offered) return state;
 
-      // Prospect commits based on interest level
       const committed = Math.random() < prospect.interestLevel;
       return {
         prospects: state.prospects.map((p) =>
@@ -708,21 +644,126 @@ export const useGameStore = create<GameStore>((set) => ({
       };
     }),
 
-  /**
-   * Finish recruiting: add committed prospects to the team roster, create a new
-   * season schedule, and navigate back to the season hub.
-   */
-  advanceWeek: () => void;
+  advanceWeek: () => {
+    set({ isSimulating: true });
+    setTimeout(() => {
+      set((state) => {
+        const { season, prospects } = state;
+        if (!season) return { ...state, isSimulating: false };
+
+        const hasRecruitingMagnet = season.coach.traits.includes("Recruiting Magnet");
+        const hasNILGuru = season.coach.traits.includes("NIL Guru");
+        
+        const basePoints = 100 + (season.coach.recruiting / 100) * 50;
+        const traitBonus = hasRecruitingMagnet ? 25 : 0;
+        const newPoints = Math.round(basePoints + traitBonus);
+
+        const nilBudgetBonus = hasNILGuru ? 5000 : 0;
+        const updatedNilBudget = season.nilBudget + nilBudgetBonus;
+
+        const updatedProspects = prospects.map((p) => {
+          if (p.committed) return p;
+          
+          let interest = p.interestLevel * 0.95;
+          const competitionFactor = (p.rating / 100) * 0.04;
+          interest -= competitionFactor;
+
+          if (p.nilOffer > 0) {
+            const satisfaction = Math.min(0.05, p.nilOffer / 1000000);
+            interest += satisfaction;
+          }
+
+          let committed = p.committed;
+          if (p.offered && !committed) {
+            const commitRoll = Math.random();
+            if (commitRoll < (p.interestLevel * 0.2)) {
+              committed = true;
+            }
+          }
+
+          return { 
+            ...p, 
+            committed,
+            interestLevel: Math.max(0.01, Math.min(0.99, interest)) 
+          };
+        });
+
+        const isSeasonEnd = season.currentGameIndex >= season.schedule.length - 1;
+
+        if (isSeasonEnd) {
+          // Transition to Conference Tournament
+          const confTeams = getConferenceTeams(season.conferenceName);
+          const confTourney = generateConferenceTournament(season.conferenceName, confTeams);
+          
+          return {
+            isSimulating: false,
+            season: {
+              ...season,
+              postseasonStatus: "conf_tourney",
+              tournaments: [confTourney],
+            },
+            screen: "tournaments" as import("../game/types").Screen,
+          };
+        }
+
+        return {
+          isSimulating: false,
+          season: {
+            ...season,
+            recruitingPoints: newPoints,
+            nilBudget: updatedNilBudget,
+            currentGameIndex: season.currentGameIndex + 1,
+          },
+          prospects: updatedProspects,
+        };
+      });
+    }, 500);
+  },
+
   finishRecruiting: () =>
     set((state) => {
       const { season, prospects } = state;
       if (!season) return state;
 
-      const committed = prospects.filter((p) => p.committed);
-      const roster = [...season.team.roster];
+      // 1. Save History
+      const historyEntry: import("../game/types").SeasonHistory = {
+        year: season.year,
+        teamId: season.team.id,
+        teamName: season.team.name,
+        wins: season.record.wins,
+        losses: season.record.losses,
+        postseason: season.postseasonStatus ?? "Regular Season",
+      };
+      const updatedHistory = [...season.coach.history, historyEntry];
 
-      // Assign jersey numbers to incoming freshmen (avoid collisions)
-      const usedNumbers = new Set(roster.map((p) => p.number));
+      // 2. Graduate Seniors & Age Players
+      const YEAR_ORDER: import("../game/types").PlayerYear[] = ["FR", "SO", "JR", "SR"];
+      const agedRoster = season.team.roster
+        .filter(p => p.year !== "SR") // Graduate
+        .map(p => {
+          const nextIdx = YEAR_ORDER.indexOf(p.year) + 1;
+          const nextYear = YEAR_ORDER[nextIdx];
+          
+          // Player Development logic
+          const devBonus = (season.coach.development / 100) * 3;
+          const randomJump = Math.random() * 4 + devBonus;
+          
+          return {
+            ...p,
+            year: nextYear,
+            ratings: {
+              speed: Math.min(99, p.ratings.speed + randomJump * 0.5),
+              shooting: Math.min(99, p.ratings.shooting + randomJump),
+              passing: Math.min(99, p.ratings.passing + randomJump),
+              defense: Math.min(99, p.ratings.defense + randomJump * 0.8),
+              rebounding: Math.min(99, p.ratings.rebounding + randomJump * 0.8),
+            }
+          };
+        });
+
+      // 3. Add Committed Recruits
+      const committed = prospects.filter((p) => p.committed);
+      const usedNumbers = new Set(agedRoster.map((p) => p.number));
       let nextNum = 1;
       const getNum = (): number => {
         while (usedNumbers.has(nextNum)) nextNum++;
@@ -731,83 +772,72 @@ export const useGameStore = create<GameStore>((set) => ({
       };
 
       for (const prospect of committed) {
-        roster.push(prospectToPlayer(prospect, getNum()));
+        agedRoster.push(prospectToPlayer(prospect, getNum()));
       }
 
-      // Rebuild lineup: keep existing valid starters, then fill from new additions
-      const existingLineupIds = new Set(season.team.lineup);
-      const starters = season.team.lineup.filter((id) =>
-        roster.some((p) => p.id === id)
-      );
-      const benchPool = roster.filter((p) => !existingLineupIds.has(p.id));
-      const newLineup = [
-        ...starters,
-        ...benchPool.map((p) => p.id),
-      ].slice(0, 5) as import("../game/types").Lineup;
+      // 4. Update Lineup
+      const newLineup = agedRoster.slice(0, 5).map(p => p.id) as import("../game/types").Lineup;
+      const updatedTeam = { ...season.team, roster: agedRoster, lineup: newLineup };
 
-      const updatedTeam = { ...season.team, roster, lineup: newLineup };
-
-      // Build a fresh 13-game schedule from the default template, preserving
-      // the current season's year, prestige, coach, and team.
-      const templateSeason = createDefaultSeason();
-      const templateSchedule = templateSeason.schedule;
+      // 5. Generate New Schedule
+      const newYear = season.year + 1;
+      const confName = season.conferenceName;
+      const confOpponents = getConferenceTeams(confName);
+      
+      const newSchedule: import("../game/types").SeasonGame[] = [];
+      // 4 Non-conf
+      AVAILABLE_TEAMS.slice(rand(0, 200), rand(0, 200) + 4).forEach((opp, i) => {
+        newSchedule.push({
+          id: `game_${newYear}_nc_${i}`,
+          week: i + 1,
+          isHome: i % 2 === 0,
+          opponent: opp,
+          result: null,
+          userScore: 0,
+          opponentScore: 0,
+          gameType: "nc"
+        });
+      });
+      // 8 Conference
+      confOpponents.slice(0, 8).forEach((opp, i) => {
+        newSchedule.push({
+          id: `game_${newYear}_conf_${i}`,
+          week: i + 5,
+          isHome: i % 2 === 1,
+          opponent: opp,
+          result: null,
+          userScore: 0,
+          opponentScore: 0,
+          gameType: "conf"
+        });
+      });
 
       const classRating = committed.reduce((sum, p) => sum + p.rating, 0) / Math.max(1, committed.length);
-      // Simplified rank: higher rating = lower (better) rank
       const classRank = Math.max(1, Math.min(100, Math.round(100 - (classRating - 60) * 2.5)));
 
       return {
         season: {
           ...season,
+          year: newYear,
+          history: updatedHistory,
+          coach: { ...season.coach, history: updatedHistory },
           team: updatedTeam,
-          schedule: templateSchedule,
+          schedule: newSchedule,
           record: { wins: 0, losses: 0 },
           conferenceRecord: { wins: 0, losses: 0 },
           currentGameIndex: 0,
           seasonStats: {},
           gamesPlayedWithStats: 0,
           rank: null,
-          top25: generateTop25(updatedTeam, templateSchedule.map(g => g.opponent)),
+          top25: [],
           recruitingClassRating: Math.round(classRating),
           recruitingClassRank: classRank,
+          postseasonStatus: "none",
+          tournaments: [],
         },
         prospects: [],
         scoutingPoints: 0,
         screen: "season" as Screen,
-      };
-    }),
-
-  advanceWeek: () =>
-    set((state) => {
-      const { season, prospects } = state;
-      if (!season) return state;
-
-      // 1. Regenerate recruiting points
-      const basePoints = 100 + (season.coach.recruiting / 100) * 50;
-      const newPoints = Math.round(basePoints);
-
-      // 2. Simulate AI recruiting (other teams)
-      // Prospects lose interest if the user doesn't contact them, or if others offer more.
-      const updatedProspects = prospects.map((p) => {
-        if (p.committed) return p;
-        
-        // Decay interest slightly each week
-        let interest = p.interestLevel * 0.96;
-        
-        // AI competition: higher rated prospects are harder to keep interested
-        const competitionFactor = (p.rating / 100) * 0.05;
-        interest -= competitionFactor;
-
-        return { ...p, interestLevel: Math.max(0.01, Math.min(0.99, interest)) };
-      });
-
-      return {
-        season: {
-          ...season,
-          recruitingPoints: newPoints,
-          currentGameIndex: season.currentGameIndex + 1,
-        },
-        prospects: updatedProspects,
       };
     }),
 
@@ -829,22 +859,188 @@ export const useGameStore = create<GameStore>((set) => ({
         },
       };
     }),
-
-  updateGamePlan: (plan) =>
+  
+  upgradeCoachTrait: (trait) =>
     set((state) => {
       const { season } = state;
-      if (!season) return state;
+      if (!season || season.coach.traitPoints <= 0 || season.coach.traits.includes(trait)) return state;
 
       return {
         season: {
           ...season,
-          gamePlan: {
-            ...season.gamePlan,
-            ...plan,
+          coach: {
+            ...season.coach,
+            traitPoints: season.coach.traitPoints - 1,
+            traits: [...season.coach.traits, trait],
           },
         },
       };
     }),
+
+  acceptJobOffer: (offerId) =>
+    set((state) => {
+      const { season } = state;
+      if (!season) return state;
+      const offer = season.jobOffers.find((o) => o.id === offerId);
+      if (!offer) return state;
+
+      // Move to new program
+      const baseTeam = AVAILABLE_TEAMS.find(t => t.id === offer.teamId) || {
+        id: offer.teamId, 
+        name: offer.teamName, 
+        nickname: "Warriors", 
+        abbreviation: offer.teamId.substring(0, 3).toUpperCase(),
+        primaryColor: "#333",
+        secondaryColor: "#777",
+        region: "Midwest",
+        chemistry: 70
+      };
+      const newTeam = setupUserTeam(baseTeam, offer.prestige);
+
+      const updatedCoach: import("../game/types").Coach = {
+        ...season.coach,
+        history: [
+          ...season.coach.history,
+          {
+            teamId: season.team.id,
+            teamName: season.team.name,
+            year: season.year - 1,
+            wins: season.record.wins,
+            losses: season.record.losses,
+          },
+        ],
+      };
+
+      const newSeason = createInitialSeason(newTeam, updatedCoach, state.settings);
+
+      return {
+        season: {
+          ...newSeason,
+          year: season.year, 
+          budget: Math.round(offer.salary / 100), 
+          nilBudget: offer.nilBudget,
+        },
+        screen: "season",
+      };
+    }),
+
+  stayAtSchool: () =>
+    set((state) => {
+      if (!state.season) return state;
+      return {
+        season: {
+          ...state.season,
+          jobOffers: [],
+        },
+      };
+    }),
+
+  updateGamePlan: (plan) =>
+    set((state) => ({
+      season: state.season ? { ...state.season, gamePlan: { ...state.season.gamePlan, ...plan } } : null,
+    })),
+
+  advanceTournamentRound: (tournamentId: string) => {
+    set({ isSimulating: true });
+    setTimeout(() => {
+      set((state) => {
+        const { season } = state;
+        if (!season) return { ...state, isSimulating: false };
+
+        const updatedTournaments = season.tournaments.map((t) => {
+          if (t.id !== tournamentId || t.winner) return t;
+
+          const round = t.bracket.rounds[t.currentRound];
+          
+          // Simulate all games in current round
+          const updatedGames = round.games.map((g) => {
+            if (g.winnerId) return g;
+            
+            const home = g.homeTeam;
+            const away = g.awayTeam;
+            if (!home || !away) return g;
+
+            const hOverall = computeTeamOverall(home);
+            const aOverall = computeTeamOverall(away);
+            const prob = 0.5 + (hOverall - aOverall) / 50;
+            const winner = Math.random() < prob ? home : away;
+            
+            return {
+              ...g,
+              homeScore: Math.round(65 + Math.random() * 20),
+              awayScore: Math.round(65 + Math.random() * 20),
+              winnerId: winner.id
+            };
+          });
+
+          const updatedRounds = [...t.bracket.rounds];
+          updatedRounds[t.currentRound] = { ...round, games: updatedGames };
+
+          // Advance winners to next round
+          const nextRound = t.bracket.rounds[t.currentRound + 1];
+          if (nextRound) {
+            const nextRoundGames = [...nextRound.games];
+            updatedGames.forEach((g, idx) => {
+              const winner = g.winnerId === g.homeTeam?.id ? g.homeTeam : g.awayTeam;
+              const nextGameIdx = Math.floor(idx / 2);
+              const isHome = idx % 2 === 0;
+              const nextGame = { ...nextRoundGames[nextGameIdx] };
+              
+              if (isHome) nextGame.homeTeam = winner;
+              else nextGame.awayTeam = winner;
+              
+              nextRoundGames[nextGameIdx] = nextGame;
+            });
+            updatedRounds[t.currentRound + 1] = { ...nextRound, games: nextRoundGames };
+          }
+
+          const isLastRound = t.currentRound === t.bracket.rounds.length - 1;
+          const winnerId = isLastRound ? updatedGames[0].winnerId : undefined;
+
+          return {
+            ...t,
+            bracket: { rounds: updatedRounds },
+            currentRound: isLastRound ? t.currentRound : t.currentRound + 1,
+            winner: winnerId
+          };
+        });
+
+        // Check if postseason needs to transition
+        let nextStatus = season.postseasonStatus;
+        let newTours = updatedTournaments;
+
+        const activeTourney = updatedTournaments.find(t => t.id === tournamentId);
+        if (activeTourney?.winner) {
+          if (season.postseasonStatus === "conf_tourney") {
+            nextStatus = "main_tourney";
+            const main = generateMainTournament(AVAILABLE_TEAMS.map(at => makeOpponentTeam(at)));
+            const nit = generateInvitationalTournament(AVAILABLE_TEAMS.map(at => makeOpponentTeam(at)));
+            newTours = [main, nit];
+          } else if (season.postseasonStatus === "main_tourney" || season.postseasonStatus === "nit_tourney") {
+            nextStatus = "complete";
+            return {
+              isSimulating: false,
+              season: {
+                ...season,
+                tournaments: updatedTournaments,
+                postseasonStatus: "complete",
+                jobOffers: generateJobOffers(season.coach, season.team.id)
+              }
+            };
+          }
+        }
+
+        return {
+          isSimulating: false,
+          season: {
+            ...season,
+            tournaments: newTours,
+            postseasonStatus: nextStatus,
+          }
+        };
+      });
+    }, 800);
+  },
 
   upgradeNILCollective: () =>
     set((state) => {
@@ -865,7 +1061,6 @@ export const useGameStore = create<GameStore>((set) => ({
 
 /**
  * Calculate post-game revenue based on prestige, attendance, and result.
- * Ported from CFHC's team-budget and revenue logic.
  */
 function calculatePostGameRevenue(
   season: Season,
@@ -873,19 +1068,14 @@ function calculatePostGameRevenue(
   result: "win" | "loss"
 ): number {
   const prestigeFactor = season.prestige / 100;
-  // Attendance scales with prestige and opponent quality
   const attendance = Math.round(
     ((season.prestige * 2 + game.opponent.overall) / 3) * 85
   );
   const ticketPrice = 40;
-  // Home games generate full ticket revenue; away games generate 15% (travel/payout)
   const ticketRevenue = game.isHome ? attendance * ticketPrice : attendance * ticketPrice * 0.15;
   const merchRevenue = attendance * (prestigeFactor * 12 + Math.random() * 8);
   const winBonus = result === "win" ? 1800 : 300;
-
-  // NIL level provides a multiplier to merch and ticket sales (marketing boost)
   const nilMultiplier = 1 + season.nilCollectiveLevel * 0.045;
-
   return Math.round((ticketRevenue + merchRevenue + winBonus) * nilMultiplier);
 }
 
@@ -902,27 +1092,28 @@ function calculateCoachXP(season: Season, result: "win" | "loss", opponentOveral
 /**
  * Handle coach leveling and skill point accumulation.
  */
-function updateCoachProgression(coach: import("../game/types").Coach, xp: number): import("../game/types").Coach {
-  let { level, experience, skillPoints } = coach;
+function updateCoachProgression(coach: Coach, xp: number): Coach {
+  let { level, experience, skillPoints, traitPoints } = coach;
   experience += xp;
   const xpNeeded = level * 120 + 80;
   if (experience >= xpNeeded) {
     level += 1;
     experience -= xpNeeded;
     skillPoints += 1;
+    // Award a trait point every 3 levels
+    if (level % 3 === 0) {
+      traitPoints += 1;
+    }
   }
-  return { ...coach, level, experience, skillPoints };
+  return { ...coach, level, experience, skillPoints, traitPoints };
 }
 
 /**
  * Update team rank and Top 25 list after a game.
  */
 function calculateRankingsUpdate(season: Season, result: "win" | "loss") {
-  // Simplified logic: adjust votes based on result, then re-sort
   const userTeamId = season.team.id;
   let newTop25 = [...season.top25];
-  
-  // Update user team votes
   const userEntry = newTop25.find(t => t.teamId === userTeamId);
   if (userEntry) {
     userEntry.record = {
@@ -930,30 +1121,20 @@ function calculateRankingsUpdate(season: Season, result: "win" | "loss") {
       losses: season.record.losses + (result === "loss" ? 1 : 0),
     };
     userEntry.votes += result === "win" ? 45 : -30;
-  } else if (result === "win" && season.record.wins > season.record.losses) {
-    // If not ranked, potentially enter Top 25 if we keep winning
-    // For now we just check the list
   }
-
-  // Randomly adjust other teams to simulate a living world
   newTop25 = newTop25.map(t => {
     if (t.teamId === userTeamId) return t;
     const roll = Math.random();
-    return {
-      ...t,
-      votes: t.votes + (roll > 0.6 ? 15 : roll < 0.2 ? -15 : 0)
-    };
+    return { ...t, votes: t.votes + (roll > 0.6 ? 15 : roll < 0.2 ? -15 : 0) };
   });
-
   newTop25.sort((a, b) => b.votes - a.votes);
   const newRankIdx = newTop25.findIndex(t => t.teamId === userTeamId);
   const newRank = newRankIdx !== -1 ? newRankIdx + 1 : null;
-
   return { top25: newTop25, rank: newRank };
 }
 
 /**
- * Generate a rich news item for a game result (OOTP-style).
+ * Generate a rich news item for a game result.
  */
 function generateGameNewsItem(
   game: SeasonGame,
@@ -968,7 +1149,6 @@ function generateGameNewsItem(
   const isUpset = result === "win" && opp.overall > 78;
   const isBlowout = margin > 18;
   const isNailBiter = margin <= 4;
-  const isConf = game.gameType === "conf" || game.gameType === "conf-title";
   const venue = game.isHome ? "home" : "at " + opp.abbreviation;
 
   let headline = "";
@@ -977,44 +1157,20 @@ function generateGameNewsItem(
 
   if (result === "win") {
     if (isUpset && isBlowout) {
-      headline = `Dominant upset! ${userScore}â€“${oppScore} statement win vs ${opp.name} ${opp.nickname}`;
-      detail = `Complete team effort in a convincing victory over a top program. The polls will take notice.`;
+      headline = `Dominant upset! ${userScore}–${oppScore} statement win vs ${opp.name} ${opp.nickname}`;
     } else if (isUpset) {
-      headline = `Upset alert! Knock off ${opp.name} ${opp.nickname} ${userScore}â€“${oppScore}`;
-      detail = `Gutsy performance against a more-talented opponent. National recognition could follow.`;
+      headline = `Upset alert! Knock off ${opp.name} ${opp.nickname} ${userScore}–${oppScore}`;
     } else if (isBlowout) {
-      headline = `Blowout win â€” ${userScore}â€“${oppScore} over ${opp.name} ${opp.nickname}`;
-      detail = `Dominant on both ends. The margin of victory sends a clear message to the conference.`;
+      headline = `Blowout win — ${userScore}–${oppScore} over ${opp.name} ${opp.nickname}`;
     } else if (isNailBiter) {
-      headline = `Survived! Escape ${venue} in ${userScore}â€“${oppScore} thriller`;
-      detail = `Nerves of steel. The final buzzer couldn't come soon enough in a hard-fought contest.`;
-    } else if (isConf) {
-      headline = `Conference win â€” ${userScore}â€“${oppScore} over ${opp.name} ${opp.nickname}`;
-      detail = `Important league victory improves conference standing. Standings tighten at the top.`;
+      headline = `Survived! Escape ${venue} in ${userScore}–${oppScore} thriller`;
     } else {
-      const phrases = [
-        `Pick up win number ${newRecord.wins}, ${userScore}â€“${oppScore} over ${opp.name} ${opp.nickname}`,
-        `${opp.name} ${opp.nickname} fall ${userScore}â€“${oppScore} in solid team effort`,
-        `Win over ${opp.name} ${opp.nickname} ${userScore}â€“${oppScore}. Record moves to ${newRecord.wins}â€“${newRecord.losses}`,
-      ];
-      headline = phrases[Math.floor(Math.random() * phrases.length)];
-      detail = `Program builds momentum heading into the heart of the schedule.`;
+      headline = `Win over ${opp.name} ${opp.nickname} ${userScore}–${oppScore}`;
     }
+    detail = `Program builds momentum heading into the heart of the schedule.`;
   } else {
-    tone = "negative";
-    if (isBlowout) {
-      headline = `Tough loss â€” fell ${userScore}â€“${oppScore} to ${opp.name} ${opp.nickname}`;
-      detail = `A difficult performance. The coaching staff will have much to review on film.`;
-    } else if (isNailBiter) {
-      headline = `Heartbreaker â€” lose ${userScore}â€“${oppScore} at the wire to ${opp.name} ${opp.nickname}`;
-      detail = `Controlled the game but couldn't finish. A loss that will sting for days.`;
-    } else if (isConf) {
-      headline = `Conference loss â€” ${userScore}â€“${oppScore} to ${opp.name} ${opp.nickname}`;
-      detail = `Standings hit. Must regroup quickly with important games ahead.`;
-    } else {
-      headline = `Fell to ${opp.name} ${opp.nickname} ${userScore}â€“${oppScore} in ${game.isHome ? "home" : "road"} setback`;
-      detail = `Record drops to ${newRecord.wins}â€“${newRecord.losses}. Bounce-back game needed next week.`;
-    }
+    headline = `Fell to ${opp.name} ${opp.nickname} ${userScore}–${oppScore}`;
+    detail = `Record drops to ${newRecord.wins}–${newRecord.losses}. Bounce-back game needed soon.`;
   }
 
   return {

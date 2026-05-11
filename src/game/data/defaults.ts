@@ -31,7 +31,7 @@ const NICKNAMES = [
 ];
 
 /** Return a random integer in [min, max]. */
-function rand(min: number, max: number): number {
+export function rand(min: number, max: number): number {
   return min + Math.floor(Math.random() * (max - min + 1));
 }
 
@@ -242,29 +242,106 @@ export const defaultCoach: Coach = {
   careerLosses: 0,
 };
 
-const SEASON_OPPONENTS: SeasonOpponent[] = [
-  { id: "opp_1",  name: "Riverside",   nickname: "Hawks",     abbreviation: "RVH", primaryColor: "#7c3aed", secondaryColor: "#ffffff", overall: 68, region: "West" },
-  { id: "opp_2",  name: "Eastern",     nickname: "Eagles",    abbreviation: "EWE", primaryColor: "#0369a1", secondaryColor: "#fbbf24", overall: 72, region: "East" },
-  { id: "opp_3",  name: "Summit",      nickname: "Wolves",    abbreviation: "SMW", primaryColor: "#047857", secondaryColor: "#ffffff", overall: 76, region: "West" },
-  { id: "opp_4",  name: "Lakewood",    nickname: "Lions",     abbreviation: "LWL", primaryColor: "#b45309", secondaryColor: "#ffffff", overall: 71, region: "Midwest" },
-  { id: "opp_5",  name: "Northern",    nickname: "Rams",      abbreviation: "NGR", primaryColor: "#be123c", secondaryColor: "#f1f5f9", overall: 80, region: "South" },
-  { id: "opp_6",  name: "Coastal",     nickname: "Cougars",   abbreviation: "CWC", primaryColor: "#0f766e", secondaryColor: "#ffffff", overall: 74, region: "Midwest" },
-  { id: "opp_7",  name: "Midland",     nickname: "Falcons",   abbreviation: "MDF", primaryColor: "#6d28d9", secondaryColor: "#fbbf24", overall: 78, region: "South" },
-  { id: "opp_8",  name: "Hillside",    nickname: "Spartans",  abbreviation: "HLS", primaryColor: "#1e3a8a", secondaryColor: "#e2e8f0", overall: 69, region: "East" },
-  { id: "opp_9",  name: "Western",     nickname: "Bears",     abbreviation: "WBB", primaryColor: "#92400e", secondaryColor: "#ffffff", overall: 83, region: "West" },
-  { id: "opp_10", name: "Pinewood",    nickname: "Panthers",  abbreviation: "PWP", primaryColor: "#1f2937", secondaryColor: "#10b981", overall: 65, region: "East" },
+const TEAM_PREFIXES = [
+  "State", "Central", "Western", "Eastern", "Northern", "Southern", "Pacific", "Atlantic", "Mountain", "Coastal"
 ];
 
-const CONF_OPPONENTS: SeasonOpponent[] = [
-  { id: "conf_1", name: "Bay State",   nickname: "Huskies",   abbreviation: "BSH", primaryColor: "#1e3a8a", secondaryColor: "#f8fafc", overall: 72, region: "East" },
-  { id: "conf_2", name: "Hartwick",    nickname: "Colonials", abbreviation: "HTC", primaryColor: "#7c2d12", secondaryColor: "#fef3c7", overall: 76, region: "East" },
-  { id: "conf_3", name: "Northfield",  nickname: "Knights",   abbreviation: "NHK", primaryColor: "#064e3b", secondaryColor: "#d1fae5", overall: 74, region: "East" },
-  { id: "conf_4", name: "Providence",  nickname: "Friars",    abbreviation: "PRV", primaryColor: "#1c1917", secondaryColor: "#f1f5f9", overall: 79, region: "East" },
-  { id: "conf_5", name: "Kingston",    nickname: "Rams",      abbreviation: "KGR", primaryColor: "#7c3aed", secondaryColor: "#ede9fe", overall: 70, region: "East" },
-  { id: "conf_6", name: "Albright",    nickname: "Monarchs",  abbreviation: "ALB", primaryColor: "#065f46", secondaryColor: "#d1fae5", overall: 77, region: "East" },
-  { id: "conf_7", name: "Lakewell",    nickname: "Chargers",  abbreviation: "LWC", primaryColor: "#c2410c", secondaryColor: "#fef3c7", overall: 73, region: "East" },
-  { id: "conf_8", name: "Bluemont",    nickname: "Bears",     abbreviation: "BLB", primaryColor: "#0369a1", secondaryColor: "#f0f9ff", overall: 68, region: "East" },
+const TEAM_NAMES = [
+  "Abilene", "Akron", "Albany", "Alcorn", "American", "Appalachian", "Arizona", "Arkansas", "Auburn", "Austin",
+  "Ball", "Baylor", "Belmont", "Bethune", "Boise", "Boston", "Bowling Green", "Bradley", "Brown", "Bucknell",
+  "Buffalo", "Butler", "California", "Campbell", "Canisius", "Charleston", "Charlotte", "Chattanooga", "Chicago",
+  "Cincinnati", "Clemson", "Cleveland", "Colgate", "Colorado", "Columbia", "Connecticut", "Coppin", "Cornell",
+  "Creighton", "Dartmouth", "Davidson", "Dayton", "Delaware", "Denver", "DePaul", "Detroit", "Drake", "Drexel",
+  "Duke", "Duquesne", "Elon", "Evansville", "Fairfield", "Fairleigh", "Florida", "Fordham",
+  "Fresno", "Furman", "Gardner", "George", "Georgetown", "Georgia", "Gonzaga", "Grambling", "Grand", "Green Bay",
+  "Hampton", "Hartford", "Harvard", "Hawaii", "High", "Hofstra", "Holy", "Houston", "Howard", "Idaho",
+  "Illinois", "Incarnate", "Indiana", "Iona", "Iowa", "IUPUI", "Jackson", "Jacksonville", "James", "Kansas",
+  "Kennesaw", "Kent", "Kentucky", "La Salle", "Lafayette", "Lamar", "Lehigh", "Liberty", "Lipscomb", "Little",
+  "Long", "Louisiana", "Louisville", "Loyola", "LSU", "Maine", "Manhattan", "Marist", "Marquette", "Marshall",
+  "Maryland", "McNeese", "Memphis", "Mercer", "Merrimack", "Miami", "Michigan", "Middle", "Milwaukee", "Minnesota",
+  "Mississippi", "Missouri", "Montana", "Morehead", "Morgan", "Mount", "Murray", "Navy", "NC", "Nebraska",
+  "Nevada", "New", "Niagara", "Nicholls", "NJIT", "Norfolk", "North", "Northeastern", "Northwestern",
+  "Notre Dame", "Oakland", "Ohio", "Oklahoma", "Old", "Ole Miss", "Oral", "Oregon", "Pacific", "Penn",
+  "Pepperdine", "Pittsburgh", "Portland", "Prairie", "Presbyterian", "Princeton", "Providence", "Purdue", "Quinnipiac", "Radford",
+  "Rhode Island", "Rice", "Richmond", "Rider", "Robert", "Rutgers", "Sacramento", "Sacred", "Saint", "Sam",
+  "San Diego", "San Francisco", "San Jose", "Santa", "Savannah", "Seattle", "Seton", "Siena", "SIU", "SMU",
+  "South", "Southeastern", "Southern", "Stanford", "Stephen", "Stetson", "Stony", "Syracuse", "TCU", "Temple",
+  "Tennessee", "Texas", "Toledo", "Towson", "Troy", "Tulane", "Tulsa", "UAB", "UC", "UCF",
+  "UCLA", "UCSB", "UMass", "UMBC", "UMKC", "UNC", "UNLV", "USC", "USF", "Utah",
+  "UTEP", "UTRGV", "UTSA", "Valparaiso", "Vanderbilt", "VCU", "Vermont", "Villanova", "Virginia", "VMI",
+  "Wagner", "Wake Forest", "Washington", "West", "Western", "Wichita", "William", "Winthrop", "Wisconsin", "Wofford",
+  "Wright", "Wyoming", "Xavier", "Yale", "Youngstown"
 ];
+
+const TEAM_NICKNAMES = [
+  "Wildcats", "Tigers", "Bulldogs", "Spartans", "Bruins", "Wolverines", "Huskies", "Jayhawks", 
+  "Tar Heels", "Blue Devils", "Longhorns", "Aggies", "Buckeyes", "Badgers", "Gators", 
+  "Cardinals", "Utes", "Ducks", "Beavers", "Golden Bears", "Panthers", "Eagles", "Wolves", "Lions",
+  "Rams", "Cougars", "Falcons", "Knights", "Friars", "Monarchs", "Chargers", "Owls", "Dolphins",
+  "Rebels", "Gauchos", "Tritons", "Matadors", "Anteaters", "Highlanders", "Titans", "Lumberjacks",
+  "Enforcers", "Miners", "Roadrunners", "Bison", "Redhawks", "Gaels", "Dons", "Toreros"
+];
+
+const REGIONS: ("West" | "Midwest" | "East" | "South")[] = ["West", "Midwest", "East", "South"];
+const COLORS = ["#1e40af", "#b91c1c", "#047857", "#7c3aed", "#b45309", "#0f766e", "#6d28d9", "#1e3a8a", "#92400e", "#1f2937"];
+
+/** Generate a massive list of 300+ teams dynamically */
+function generateAllTeams(): SeasonOpponent[] {
+  const teams: SeasonOpponent[] = [];
+  let idCounter = 1;
+
+  // Mix names, prefixes, and nicknames to reach 300+
+  for (const name of TEAM_NAMES) {
+    const region = REGIONS[Math.floor(Math.random() * REGIONS.length)];
+    const nickname = TEAM_NICKNAMES[Math.floor(Math.random() * TEAM_NICKNAMES.length)];
+    const primary = COLORS[Math.floor(Math.random() * COLORS.length)];
+    
+    teams.push({
+      id: `team_${idCounter++}`,
+      name: name,
+      nickname: nickname,
+      abbreviation: name.substring(0, 3).toUpperCase(),
+      primaryColor: primary,
+      secondaryColor: "#ffffff",
+      overall: 65 + Math.floor(Math.random() * 25),
+      region: region
+    });
+
+    // Add some "State" variations to reach the goal
+    if (teams.length < 350 && Math.random() > 0.6) {
+       const prefix = TEAM_PREFIXES[Math.floor(Math.random() * TEAM_PREFIXES.length)];
+       teams.push({
+         id: `team_${idCounter++}`,
+         name: `${name} ${prefix}`,
+         nickname: TEAM_NICKNAMES[Math.floor(Math.random() * TEAM_NICKNAMES.length)],
+         abbreviation: (name.substring(0, 2) + prefix.substring(0, 1)).toUpperCase(),
+         primaryColor: COLORS[Math.floor(Math.random() * COLORS.length)],
+         secondaryColor: "#ffffff",
+         overall: 60 + Math.floor(Math.random() * 25),
+         region: region
+       });
+    }
+  }
+
+  return teams;
+}
+
+export const AVAILABLE_TEAMS = generateAllTeams();
+
+const SEASON_OPPONENTS: SeasonOpponent[] = AVAILABLE_TEAMS.slice(0, 100);
+
+const CONFERENCES = [
+  "Big East", "ACC", "SEC", "Big 10", "Big 12", "Pac 12", "Mountain West", "A-10", "AAC", "MAC",
+  "Sun Belt", "C-USA", "WCC", "Horizon", "MAAC", "MVC", "OVC", "Patriot", "SoCon", "Southland",
+  "Summit", "SWAC", "WAC", "Big Sky", "Big South"
+];
+
+export function getConferenceTeams(confName: string): SeasonOpponent[] {
+  // Simple deterministic assignment based on index
+  const confIdx = CONFERENCES.indexOf(confName);
+  const start = confIdx * 12;
+  return AVAILABLE_TEAMS.slice(start, start + 12);
+}
 
 export function makeOpponentTeam(opponent: SeasonOpponent): Team {
   const slots: [PlayerPosition, number][] = [
@@ -315,28 +392,25 @@ export function createInitialSeason(
   coach: Coach,
   settings: GameSettings
 ): Season {
-  // Generate a conference of 10 teams (including user)
-  const conference = [
-    userTeam,
-    ...AVAILABLE_TEAMS.filter(t => t.id !== userTeam.id).map(t => makeTeam(t.name, t.nickname, t.abbreviation, t.primaryColor, t.secondaryColor, t.region, 70 + Math.random() * 15)),
-    ...Array.from({ length: 10 - AVAILABLE_TEAMS.length }).map((_, i) => makeTeam(`Opponent ${i}`, "Bears", "OPP", "#555", "#aaa", "Midwest", 65 + Math.random() * 10))
-  ].slice(0, 10);
+  const confName = CONFERENCES[Math.floor(Math.random() * CONFERENCES.length)];
   return {
-    year: 2025,
+    year: 2026,
     coach,
     team: userTeam,
     schedule: [],
     record: { wins: 0, losses: 0 },
     conferenceRecord: { wins: 0, losses: 0 },
     prestige: 60,
-    conferenceName: "Big East",
+    conferenceName: confName,
     currentGameIndex: 0,
     seasonStats: {},
     gamesPlayedWithStats: 0,
-    budget: 1250,
+    budget: 5000,
     nilCollectiveLevel: 0,
     rank: null,
     top25: [],
+    recruitingClassRank: null,
+    recruitingClassRating: 0,
     gamePlan: {
       pace: "balanced",
       focus: "balanced",
@@ -346,8 +420,206 @@ export function createInitialSeason(
     nilBudget: 50000,
     history: [],
     postseasonStatus: null,
+    jobOffers: [],
     news: [],
+    tournaments: [],
   };
+}
+
+export function generateConferenceTournament(confName: string, teams: Team[]): import("../types").Tournament {
+  // Sort teams by record (simulated for AI teams as random or prestige-based)
+  const seeded = [...teams].sort((a, b) => b.chemistry - a.chemistry); // Placeholder logic
+  
+  const round1: import("../types").TournamentRound = {
+    name: "Semi-Finals",
+    games: [
+      { id: `conf_${confName}_sf1`, homeTeam: seeded[0], awayTeam: seeded[3], homeSeed: 1, awaySeed: 4 },
+      { id: `conf_${confName}_sf2`, homeTeam: seeded[1], awayTeam: seeded[2], homeSeed: 2, awaySeed: 3 },
+    ]
+  };
+
+  const round2: import("../types").TournamentRound = {
+    name: "Championship",
+    games: [
+      { id: `conf_${confName}_f`, homeTeam: null, awayTeam: null }
+    ]
+  };
+
+  return {
+    id: `tourney_${confName}`,
+    name: `${confName} Tournament`,
+    type: "conference",
+    teams: seeded,
+    bracket: { rounds: [round1, round2] },
+    currentRound: 0
+  };
+}
+
+export function generateMainTournament(allTeams: Team[]): import("../types").Tournament {
+  // Take top 64 teams by overall rating (simulating resume)
+  const seeded = [...allTeams]
+    .sort((a, b) => computeTeamOverall(b) - computeTeamOverall(a))
+    .slice(0, 64);
+
+  const rounds: import("../types").TournamentRound[] = [];
+  const roundNames = ["Round of 64", "Round of 32", "Sweet 16", "Elite 8", "Final Four", "Championship"];
+  
+  let teamCount = 64;
+  for (let i = 0; i < roundNames.length; i++) {
+    const gamesCount = teamCount / 2;
+    const games: import("../types").TournamentGame[] = [];
+    
+    for (let j = 0; j < gamesCount; j++) {
+      games.push({
+        id: `main_r${i}_g${j}`,
+        homeTeam: i === 0 ? seeded[j] : null,
+        awayTeam: i === 0 ? seeded[teamCount - 1 - j] : null,
+        homeSeed: i === 0 ? j + 1 : undefined,
+        awaySeed: i === 0 ? teamCount - j : undefined,
+      });
+    }
+    
+    rounds.push({ name: roundNames[i], games });
+    teamCount /= 2;
+  }
+
+  return {
+    id: "tourney_main",
+    name: "National Championship",
+    type: "main",
+    teams: seeded,
+    bracket: { rounds },
+    currentRound: 0
+  };
+}
+
+export function generateInvitationalTournament(allTeams: Team[]): import("../types").Tournament {
+  // Take the next 32 teams after the top 64
+  const seeded = [...allTeams]
+    .sort((a, b) => computeTeamOverall(b) - computeTeamOverall(a))
+    .slice(64, 96);
+
+  const rounds: import("../types").TournamentRound[] = [];
+  const roundNames = ["Round of 32", "Sweet 16", "Elite 8", "Final Four", "Championship"];
+  
+  let teamCount = 32;
+  for (let i = 0; i < roundNames.length; i++) {
+    const gamesCount = teamCount / 2;
+    const games: import("../types").TournamentGame[] = [];
+    
+    for (let j = 0; j < gamesCount; j++) {
+      games.push({
+        id: `inv_r${i}_g${j}`,
+        homeTeam: i === 0 ? seeded[j] : null,
+        awayTeam: i === 0 ? seeded[teamCount - 1 - j] : null,
+        homeSeed: i === 0 ? j + 1 : undefined,
+        awaySeed: i === 0 ? teamCount - j : undefined,
+      });
+    }
+    
+    rounds.push({ name: roundNames[i], games });
+    teamCount /= 2;
+  }
+
+  return {
+    id: "tourney_inv",
+    name: "Secondary Invitational",
+    type: "invitational",
+    teams: seeded,
+    bracket: { rounds },
+    currentRound: 0
+  };
+}
+
+export function generateJobOffers(coach: Coach, currentTeamId: string): import("../types").JobOffer[] {
+  const offers: import("../types").JobOffer[] = [];
+  const totalGames = coach.careerWins + coach.careerLosses;
+  const winPct = totalGames > 0 ? coach.careerWins / totalGames : 0;
+  
+  // Calculate Coach Prestige (0-100)
+  // Factors: Level, Win %, Titles (simulated for now by high win pct seasons), and longevity
+  const careerScore = (coach.level * 8) + (winPct * 40) + (Math.min(10, coach.history.length) * 2);
+  const coachPrestige = Math.max(10, Math.min(99, careerScore));
+
+  const currentTeam = AVAILABLE_TEAMS.find(t => t.id === currentTeamId);
+  const availablePool = AVAILABLE_TEAMS.filter(t => t.id !== currentTeamId);
+  
+  // Sort pool by prestige to find appropriate tiers
+  const elitePool = availablePool.filter(t => t.overall > 82); // Powerhouses
+  const majorPool = availablePool.filter(t => t.overall >= 74 && t.overall <= 82); // Solid programs
+  const midPool = availablePool.filter(t => t.overall < 74); // Mid-majors/Rebuilds
+
+  // Tier 1: Elite Offers (Only for high prestige coaches)
+  if (coachPrestige > 75) {
+    const target = elitePool[rand(0, elitePool.length - 1)];
+    if (target) {
+      offers.push({
+        id: `job_${target.id}_${Date.now()}`,
+        teamId: target.id,
+        teamName: target.name,
+        prestige: target.overall,
+        salary: 1200000 + (coach.level * 200000),
+        nilBudget: 80000 + (target.overall * 2000),
+        recruitingBudget: 300 + (target.overall * 5),
+        expectations: "National Contender"
+      });
+    }
+  }
+
+  // Tier 2: Moving Up (Coach prestige exceeds current team prestige)
+  if (coachPrestige > (currentTeam?.overall ?? 0) + 5) {
+    const upwardPool = majorPool.filter(t => t.overall > (currentTeam?.overall ?? 0));
+    const target = upwardPool[rand(0, upwardPool.length - 1)];
+    if (target) {
+      offers.push({
+        id: `job_${target.id}_${Date.now()}_up`,
+        teamId: target.id,
+        teamName: target.name,
+        prestige: target.overall,
+        salary: 600000 + (coach.level * 100000),
+        nilBudget: 40000 + (target.overall * 1000),
+        recruitingBudget: 200 + (target.overall * 2),
+        expectations: "Win Conference"
+      });
+    }
+  }
+
+  // Tier 3: Geographic/Lateral Moves (Programs in the same region looking for stability)
+  if (currentTeam) {
+    const regionalPool = availablePool.filter(t => t.region === currentTeam.region && Math.abs(t.overall - currentTeam.overall) < 10);
+    const target = regionalPool[rand(0, regionalPool.length - 1)];
+    if (target && !offers.some(o => o.teamId === target.id)) {
+      offers.push({
+        id: `job_${target.id}_${Date.now()}_reg`,
+        teamId: target.id,
+        teamName: target.name,
+        prestige: target.overall,
+        salary: 300000 + (coach.level * 50000),
+        nilBudget: 20000 + (target.overall * 500),
+        recruitingBudget: 150 + (target.overall * 1),
+        expectations: target.overall > 75 ? "Compete" : "Rebuild"
+      });
+    }
+  }
+
+  // Ensure at least one fallback offer for decent coaches
+  if (offers.length === 0 && coachPrestige > 30) {
+    const target = midPool[rand(0, midPool.length - 1)];
+    if (target) {
+      offers.push({
+        id: `job_${target.id}_fallback`,
+        teamId: target.id,
+        teamName: target.name,
+        prestige: target.overall,
+        salary: 150000 + (coach.level * 25000),
+        nilBudget: 15000,
+        recruitingBudget: 100,
+        expectations: "Rebuild"
+      });
+    }
+  }
+
+  return offers;
 }
 
 export function setupUserTeam(t: Omit<Team, "roster" | "lineup">, overall = 75): Team {

@@ -269,9 +269,9 @@ export interface SimEvent {
 // Game State (UI-level)
 // ---------------------------------------------------------------------------
 
-export type Screen = "menu" | "game" | "season" | "recruiting" | "new-game";
+export type Screen = "menu" | "new-game" | "game" | "season" | "recruiting" | "jobOffers" | "tournaments";
 
-export type GameSpeed = 1 | 2 | 4;
+export type GameSpeed = 0.5 | 1 | 2 | 4;
 
 export type SimStatus = "idle" | "running" | "paused" | "finished";
 
@@ -310,28 +310,54 @@ export interface GameSettings {
 // ---------------------------------------------------------------------------
 
 /** Head coach profile. Ratings affect strategic tendencies and team growth. */
+export type CoachTrait = 
+  | "Big Man Whisperer" 
+  | "NIL Guru" 
+  | "Defensive Specialist" 
+  | "Recruiting Magnet" 
+  | "Transfer King"
+  | "Tactical Genius"
+  | "Player Developer";
+
 export interface Coach {
   id: string;
   firstName: string;
   lastName: string;
-  /** Offensive system rating — affects shot selection and pace tendencies. */
-  offense: number; // 0–100
-  /** Defensive system rating — affects defensive intensity. */
-  defense: number; // 0–100
-  /** Recruiting rating — affects incoming talent quality. */
-  recruiting: number; // 0–100
-  /** Player development rating — affects in-season player growth. */
-  development: number; // 0–100
+  /** Offensive system rating - affects shot selection and pace tendencies. */
+  offense: number; // 0-100
+  /** Defensive system rating - affects defensive intensity. */
+  defense: number; // 0-100
+  /** Recruiting rating - affects incoming talent quality. */
+  recruiting: number; // 0-100
+  /** Player development rating - affects in-season player growth. */
+  development: number; // 0-100
   /** Current career level. Higher levels grant skill points. */
   level: number;
   /** Current experience points toward the next level. */
   experience: number;
   /** Unspent skill points used to upgrade ratings. */
   skillPoints: number;
+  /** Unspent points for specialized coaching traits. */
+  traitPoints: number;
+  /** Active specialized bonuses. */
+  traits: CoachTrait[];
   /** Total wins across all seasons in this career. */
   careerWins: number;
   /** Total losses across all seasons in this career. */
   careerLosses: number;
+  /** Historical performance record across different programs. */
+  history: { teamId: string; teamName: string; year: number; wins: number; losses: number }[];
+}
+
+export interface JobOffer {
+  id: string;
+  teamId: string;
+  teamName: string;
+  prestige: number;
+  salary: number; // For flavor
+  nilBudget: number;
+  recruitingBudget: number;
+  expectations: "Rebuild" | "Compete" | "Win Conference" | "National Contender";
 }
 
 /** Lightweight opponent descriptor stored within the season schedule. */
@@ -442,17 +468,51 @@ export interface Season {
   /** Historical records of past seasons in this career. */
   history: SeasonHistory[];
   /** Current postseason status (e.g. "Final Four", "Round of 64", null). */
-  postseasonStatus: string | null;
-  /** OOTP-style news feed for the current season. */
+  postseasonStatus: "none" | "conf_tourney" | "main_tourney" | "nit_tourney" | "complete";
+  /** Pending job offers at the end of the season. */
+  jobOffers: JobOffer[];
+  /** Active news feed for the current season. */
   news: NewsItem[];
+  tournaments: Tournament[];
+}
+
+export interface Tournament {
+  id: string;
+  name: string;
+  type: "conference" | "main" | "invitational";
+  teams: Team[];
+  bracket: TournamentBracket;
+  currentRound: number;
+  winner?: string; // Team ID
+}
+
+export interface TournamentBracket {
+  rounds: TournamentRound[];
+}
+
+export interface TournamentRound {
+  name: string;
+  games: TournamentGame[];
+}
+
+export interface TournamentGame {
+  id: string;
+  homeTeam: Team | null; // Null if TBD
+  awayTeam: Team | null;
+  homeSeed?: number;
+  awaySeed?: number;
+  homeScore?: number;
+  awayScore?: number;
+  winnerId?: string;
 }
 
 /** Record of a completed season. */
 export interface SeasonHistory {
   year: number;
-  record: { wins: number; losses: number };
-  prestige: number;
-  recruitingRank: number | null;
+  teamId: string;
+  teamName: string;
+  wins: number;
+  losses: number;
   postseason: string | null;
 }
 
