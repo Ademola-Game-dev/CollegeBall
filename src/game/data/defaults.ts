@@ -419,11 +419,60 @@ export function createInitialSeason(
   coach: Coach
 ): Season {
   const confName = CONFERENCES[Math.floor(Math.random() * CONFERENCES.length)];
+  const confOpponents = getConferenceTeams(confName)
+    .filter((opp) => opp.id !== userTeam.id)
+    .slice(0, 8);
+  const nonConfOpponents = AVAILABLE_TEAMS
+    .filter((opp) => opp.id !== userTeam.id && !confOpponents.some((confOpp) => confOpp.id === opp.id))
+    .slice(0, 4);
+
+  const schedule: SeasonGame[] = [];
+  let week = 1;
+  nonConfOpponents.forEach((opp, i) => {
+    schedule.push({
+      id: `game_${week}_nc_${i}`,
+      week: week++,
+      isHome: i % 2 === 0,
+      opponent: opp,
+      result: null,
+      userScore: null,
+      opponentScore: null,
+      gameType: "non-conf",
+    });
+  });
+  confOpponents.forEach((opp, i) => {
+    schedule.push({
+      id: `game_${week}_conf_${i}`,
+      week: week++,
+      isHome: i % 2 === 1,
+      opponent: opp,
+      result: null,
+      userScore: null,
+      opponentScore: null,
+      gameType: "conf",
+    });
+  });
+
+  const titleOpponent = [...confOpponents].sort((a, b) => b.overall - a.overall)[0];
+  if (titleOpponent) {
+    schedule.push({
+      id: `game_${week}_conf_title`,
+      week,
+      isHome: false,
+      opponent: titleOpponent,
+      result: null,
+      userScore: null,
+      opponentScore: null,
+      gameType: "conf-title",
+    });
+  }
+
+  const rankingPool = [...nonConfOpponents, ...confOpponents];
   return {
     year: 2026,
     coach,
     team: userTeam,
-    schedule: [],
+    schedule,
     record: { wins: 0, losses: 0 },
     conferenceRecord: { wins: 0, losses: 0 },
     prestige: 60,
@@ -434,7 +483,7 @@ export function createInitialSeason(
     budget: 5000,
     nilCollectiveLevel: 0,
     rank: null,
-    top25: [],
+    top25: generateTop25(userTeam, rankingPool),
     recruitingClassRank: null,
     recruitingClassRating: 0,
     gamePlan: {

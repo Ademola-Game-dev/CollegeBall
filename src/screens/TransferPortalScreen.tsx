@@ -192,7 +192,7 @@ export default function TransferPortalScreen() {
               <TransferRow 
                 key={p.id} 
                 prospect={p} 
-                onContact={pitchProspect}
+                onContact={(prospectId: string) => pitchProspect(prospectId, "playingTime")}
                 onOffer={offerProspect}
                 onScout={scoutProspect}
               />
