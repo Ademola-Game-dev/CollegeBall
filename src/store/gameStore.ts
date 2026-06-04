@@ -64,6 +64,15 @@ const RECRUITING_POOL_BUFFER = 12;
 const MIN_SCOUTING_POINTS = 3;
 /** Divisor mapping coach recruiting rating (0–100) → scouting points. */
 const RECRUITING_TO_SCOUTING_DIVISOR = 15;
+/** Scouting action cost per prospect. */
+const SCOUT_PROSPECT_COST = 1;
+
+function calculateWeeklyScoutingPoints(recruitingRating: number): number {
+  return Math.max(
+    MIN_SCOUTING_POINTS,
+    Math.round(recruitingRating / RECRUITING_TO_SCOUTING_DIVISOR)
+  );
+}
 
 export interface GameStore {
   // ---- Navigation ----
@@ -320,6 +329,7 @@ export const useGameStore = create<GameStore>((set) => ({
       screen: "season",
       gameContext: "season",
       prospects: generateProspects(60, coach.recruiting, selectedTeam.region),
+      scoutingPoints: calculateWeeklyScoutingPoints(coach.recruiting),
     }),
 
   playSeasonGame: () =>
@@ -398,12 +408,16 @@ export const useGameStore = create<GameStore>((set) => ({
         const badgeDefenseBonus = hasPostAnchor ? 3 : 0;
 
         const baseline = 65;
-        const userScore = Math.round(
+        let userScore = Math.round(
           (baseline + (userOverall / 100) * 20 + prestigeBonus + focusBonus + badgeOffenseBonus + (Math.random() - 0.5) * 12) * paceFactor
         );
-        const oppScore = Math.round(
+        let oppScore = Math.round(
           (baseline + (game.opponent.overall / 100) * 20 - defenseBonus - badgeDefenseBonus + (Math.random() - 0.5) * 12) * paceFactor
         );
+        while (userScore === oppScore) {
+          userScore += 4 + Math.floor(Math.random() * 11);
+          oppScore += 4 + Math.floor(Math.random() * 11);
+        }
         const result: "win" | "loss" = userScore > oppScore ? "win" : "loss";
 
         const isConfGame = game.gameType === "conf" || game.gameType === "conf-title";
@@ -587,14 +601,14 @@ export const useGameStore = create<GameStore>((set) => ({
           postseasonStatus: "none",
         },
         prospects: initialProspects,
-        scoutingPoints: 10,
+        scoutingPoints: calculateWeeklyScoutingPoints(season.coach.recruiting),
       };
     }),
 
 
   scoutProspect: (prospectId: string) =>
     set((state) => {
-      if (!state.season || state.season.recruitingPoints <= 0) return state;
+      if (!state.season || state.scoutingPoints < SCOUT_PROSPECT_COST) return state;
       return {
         prospects: state.prospects.map((p) => {
           if (p.id === prospectId) {
@@ -615,10 +629,7 @@ export const useGameStore = create<GameStore>((set) => ({
           }
           return p;
         }),
-        season: {
-          ...state.season,
-          recruitingPoints: state.season.recruitingPoints - 10,
-        },
+        scoutingPoints: state.scoutingPoints - SCOUT_PROSPECT_COST,
       };
     }),
 
@@ -751,6 +762,7 @@ export const useGameStore = create<GameStore>((set) => ({
             nilBudget: updatedNilBudget,
             currentGameIndex: season.currentGameIndex + 1,
           },
+          scoutingPoints: calculateWeeklyScoutingPoints(season.coach.recruiting),
           prospects: updatedProspects,
         };
       });
